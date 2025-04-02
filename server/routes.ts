@@ -451,8 +451,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
       const logs = await storage.getApiLogs(limit);
-      res.json(logs);
+      res.json(logs || []);
     } catch (error) {
+      console.error("Error fetching API logs:", error);
       res.status(500).json({ message: "Failed to fetch API logs" });
     }
   });
@@ -583,8 +584,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/featured-stocks", async (req, res) => {
     try {
       const stocks = await storage.getFeaturedStocks();
-      res.json(stocks);
+      res.json(stocks || []);
     } catch (error) {
+      console.error("Error fetching featured stocks:", error);
       res.status(500).json({ message: "Failed to fetch featured stocks" });
     }
   });

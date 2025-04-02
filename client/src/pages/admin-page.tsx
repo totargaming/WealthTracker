@@ -2,7 +2,20 @@ import { useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import { useAuth } from "@/hooks/use-auth";
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-admin";
+import { 
+  useUsers, 
+  useCreateUser, 
+  useUpdateUser, 
+  useDeleteUser, 
+  useApiLogs,
+  useRestrictedStocks,
+  useFeaturedStocks,
+  useAddRestrictedStock,
+  useRemoveRestrictedStock,
+  useAddFeaturedStock,
+  useRemoveFeaturedStock
+} from "@/hooks/use-admin";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Dialog, 
@@ -43,7 +57,20 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Loader2, Plus, Pencil, Trash2, UserCog, Download, Eye, Key, Search } from "lucide-react";
+import { 
+  Plus, 
+  Pencil, 
+  Trash2, 
+  UserCog, 
+  Download,
+  Eye,
+  Key,
+  BarChart4,
+  Loader2,
+  Search, 
+  Clock, 
+  AlertTriangle 
+} from "lucide-react";
 
 // Form validation schema for creating a new user
 const createUserSchema = z.object({
@@ -72,6 +99,19 @@ export default function AdminPage() {
   const updateUserMutation = useUpdateUser();
   const createUserMutation = useCreateUser();
   const deleteUserMutation = useDeleteUser();
+  
+  // API logs hooks
+  const { data: apiLogs, isLoading: isLoadingLogs } = useApiLogs(100);
+  
+  // Restricted stocks hooks
+  const { data: restrictedStocks, isLoading: isLoadingRestrictedStocks } = useRestrictedStocks();
+  const addRestrictedStockMutation = useAddRestrictedStock();
+  const removeRestrictedStockMutation = useRemoveRestrictedStock();
+  
+  // Featured stocks hooks
+  const { data: featuredStocks, isLoading: isLoadingFeaturedStocks } = useFeaturedStocks();
+  const addFeaturedStockMutation = useAddFeaturedStock();
+  const removeFeaturedStockMutation = useRemoveFeaturedStock();
   
   // Form for creating a new user
   const createUserForm = useForm<CreateUserFormValues>({
@@ -301,7 +341,7 @@ export default function AdminPage() {
                       </div>
                       <div className="pt-4">
                         <Button variant="outline" className="w-full">
-                          <i className="fas fa-sync-alt mr-2"></i>
+                          <BarChart4 className="h-4 w-4 mr-2" />
                           Run System Check
                         </Button>
                       </div>
@@ -326,13 +366,13 @@ export default function AdminPage() {
                             className="flex-grow h-10 px-3 border rounded-l-md bg-muted text-sm"
                           />
                           <Button variant="outline" className="rounded-l-none">
-                            <i className="fas fa-eye"></i>
+                            <Eye className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
                       <div className="pt-4">
                         <Button variant="outline" className="w-full">
-                          <i className="fas fa-key mr-2"></i>
+                          <Key className="h-4 w-4 mr-2" />
                           Update API Key
                         </Button>
                       </div>
@@ -440,87 +480,63 @@ export default function AdminPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Logs</SelectItem>
-                          <SelectItem value="user">User Activity</SelectItem>
-                          <SelectItem value="system">System</SelectItem>
+                          <SelectItem value="success">Success</SelectItem>
                           <SelectItem value="error">Errors</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button variant="outline">
-                        <i className="fas fa-download mr-2"></i>
+                        <Download className="h-4 w-4 mr-2" />
                         Export
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[180px]">Timestamp</TableHead>
-                        <TableHead>Event</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>IP Address</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">
-                          {new Date().toLocaleString()}
-                        </TableCell>
-                        <TableCell>User login</TableCell>
-                        <TableCell>admin</TableCell>
-                        <TableCell>127.0.0.1</TableCell>
-                        <TableCell>
-                          <Badge className="bg-[#36B37E]">Success</Badge>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">
-                          {new Date(Date.now() - 5 * 60000).toLocaleString()}
-                        </TableCell>
-                        <TableCell>API key updated</TableCell>
-                        <TableCell>admin</TableCell>
-                        <TableCell>127.0.0.1</TableCell>
-                        <TableCell>
-                          <Badge className="bg-[#36B37E]">Success</Badge>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">
-                          {new Date(Date.now() - 15 * 60000).toLocaleString()}
-                        </TableCell>
-                        <TableCell>User role changed</TableCell>
-                        <TableCell>admin</TableCell>
-                        <TableCell>127.0.0.1</TableCell>
-                        <TableCell>
-                          <Badge className="bg-[#36B37E]">Success</Badge>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">
-                          {new Date(Date.now() - 30 * 60000).toLocaleString()}
-                        </TableCell>
-                        <TableCell>Failed login attempt</TableCell>
-                        <TableCell>unknown</TableCell>
-                        <TableCell>192.168.1.1</TableCell>
-                        <TableCell>
-                          <Badge variant="destructive" className="bg-[#FF5630]">Failed</Badge>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-mono text-xs">
-                          {new Date(Date.now() - 60 * 60000).toLocaleString()}
-                        </TableCell>
-                        <TableCell>New user registration</TableCell>
-                        <TableCell>john.smith</TableCell>
-                        <TableCell>127.0.0.1</TableCell>
-                        <TableCell>
-                          <Badge className="bg-[#36B37E]">Success</Badge>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                  {isLoadingLogs ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[180px]">Timestamp</TableHead>
+                          <TableHead>Endpoint</TableHead>
+                          <TableHead>User ID</TableHead>
+                          <TableHead>Response Time</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {apiLogs && Array.isArray(apiLogs) && apiLogs.map((log: any) => (
+                          <TableRow key={log.id}>
+                            <TableCell className="font-mono text-xs">
+                              {new Date(log.requestTime).toLocaleString()}
+                            </TableCell>
+                            <TableCell>{log.endpoint}</TableCell>
+                            <TableCell>{log.userId || "Anonymous"}</TableCell>
+                            <TableCell>{log.responseTime ? `${log.responseTime}ms` : "N/A"}</TableCell>
+                            <TableCell>
+                              <Badge 
+                                className={log.success ? "bg-[#36B37E]" : "bg-[#FF5630]"}
+                                variant={log.success ? "default" : "destructive"}
+                              >
+                                {log.success ? "Success" : "Error"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        
+                        {(!apiLogs || !Array.isArray(apiLogs) || apiLogs.length === 0) && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                              No activity logs found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
