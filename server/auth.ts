@@ -1,5 +1,6 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Express } from "express";
 import session, { Store } from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -22,7 +23,9 @@ async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+async function comparePasswords(supplied: string, stored: string | null) {
+  if (!stored) return false;
+  
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -48,6 +51,7 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Configure the local strategy for username/password login
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -73,6 +77,114 @@ export function setupAuth(app: Express) {
         return done(error);
       }
     }),
+  );
+
+  // Configure Google OAuth strategy
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID || "",
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+        callbackURL: "/api/auth/google/callback",
+        scope: ["profile", "email"],
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          // Check if user exists with this Google ID
+          const existingUserByGoogleId = await storage.getUserByGoogleId(profile.id);
+          
+          if (existingUserByGoogleId) {
+            // User already exists, update last login
+            try {
+              const updatedUser = await storage.updateUser(existingUserByGoogleId.id, {
+                lastLogin: new Date(),
+              });
+              return done(null, updatedUser);
+            } catch (err) {
+              console.warn(
+                "Failed to update lastLogin, continuing with original user",
+                err,
+              );
+              return done(null, existingUserByGoogleId);
+            }
+          }
+
+          // No user found with Google ID, check if email exists
+          if (!profile.emails || !profile.emails[0] || !profile.emails[0].value) {
+            return done(new Error("Google did not provide an email address"));
+          }
+
+          const userEmail = profile.emails[0].value;
+          const existingUserByEmail = await storage.getUserByEmail(userEmail);
+
+          if (existingUserByEmail) {
+            // User exists with this email but not linked to Google yet
+            // Link this Google ID to the existing account
+            try {
+              const updatedUser = await storage.updateUser(existingUserByEmail.id, {
+                googleId: profile.id,
+                lastLogin: new Date(),
+              });
+              return done(null, updatedUser);
+            } catch (err) {
+              console.warn(
+                "Failed to link Google account to existing user",
+                err,
+              );
+              return done(err);
+            }
+          }
+
+          // Create a new user with Google credentials
+          try {
+            // Generate a username from the email (removing the domain)
+            let username = userEmail.split('@')[0];
+            
+            // Check if username already exists and append numbers if needed
+            let usernameExists = true;
+            let counter = 1;
+            const baseUsername = username;
+            
+            while (usernameExists) {
+              const existingUser = await storage.getUserByUsername(username);
+              if (!existingUser) {
+                usernameExists = false;
+              } else {
+                username = `${baseUsername}${counter}`;
+                counter++;
+              }
+            }
+
+            // Get user's name from profile
+            const fullName = profile.displayName || 
+              ((profile.name?.givenName || '') + ' ' + (profile.name?.familyName || '')).trim() || 
+              username;
+              
+            // Create new user
+            const avatar = profile.photos && profile.photos.length > 0 
+              ? profile.photos[0].value 
+              : undefined;
+              
+            const newUser = await storage.createUser({
+              username,
+              email: userEmail,
+              fullName,
+              avatar,
+              googleId: profile.id,
+              role: "user",
+              lastLogin: new Date(),
+            });
+            
+            return done(null, newUser);
+          } catch (error) {
+            console.error("Error creating user from Google profile:", error);
+            return done(error);
+          }
+        } catch (error) {
+          return done(error);
+        }
+      }
+    )
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
@@ -377,4 +489,18 @@ export function setupAuth(app: Express) {
       res.status(500).json({ message: "User deletion failed" });
     }
   });
+
+  // Google OAuth routes
+  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", {
+      failureRedirect: "/login?error=google-auth-failed",
+    }),
+    (req, res) => {
+      // Successful authentication, redirect to home or dashboard
+      res.redirect("/");
+    }
+  );
 }

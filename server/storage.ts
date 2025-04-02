@@ -43,6 +43,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(userId: number, role: string): Promise<User>;
@@ -176,6 +177,12 @@ export class MemStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
       (user) => user.email.toLowerCase() === email.toLowerCase(),
+    );
+  }
+  
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.googleId === googleId,
     );
   }
 
@@ -580,6 +587,15 @@ export class PostgresStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.email, email))
+      .limit(1);
+    return results[0];
+  }
+  
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const results = await this.dbInstance
+      .select()
+      .from(users)
+      .where(eq(users.googleId, googleId))
       .limit(1);
     return results[0];
   }

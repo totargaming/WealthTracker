@@ -6,7 +6,7 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),  // Can be null for OAuth users
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
   role: text("role").notNull().default("user"),
@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   darkMode: boolean("dark_mode").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   lastLogin: timestamp("last_login"),
+  googleId: text("google_id").unique(),  // Google OAuth ID
 });
 
 // User watchlist items (single watchlist per user)
@@ -121,6 +122,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   address: true,
   darkMode: true,
   lastLogin: true,
+  googleId: true,
 });
 
 export const insertUserWatchlistItemSchema = createInsertSchema(userWatchlist).pick({
