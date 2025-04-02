@@ -2,6 +2,23 @@ import axios from 'axios';
 import { Express, Request, Response } from 'express';
 import { storage } from './storage';
 
+// Fetch stock quote from FMP API
+export async function fetchStockQuote(symbol: string) {
+  if (!symbol) return null;
+  
+  try {
+    const FMP_API_KEY = process.env.FMP_API_KEY;
+    const response = await axios.get(`https://financialmodelingprep.com/api/v3/quote/${symbol}`, {
+      params: { apikey: FMP_API_KEY }
+    });
+    
+    return response.data[0] || null;
+  } catch (error) {
+    console.error(`Error fetching quote for ${symbol}:`, error);
+    return null;
+  }
+}
+
 // Log API requests to the database
 async function logApiRequest(
   userId: number | null,

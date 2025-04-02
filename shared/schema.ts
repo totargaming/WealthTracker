@@ -17,21 +17,18 @@ export const users = pgTable("users", {
   lastLogin: timestamp("last_login"),
 });
 
-// Watchlist for tracking stocks
-export const watchlist = pgTable("watchlist", {
+// User watchlist items (single watchlist per user)
+export const userWatchlist = pgTable("user_watchlist", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  description: text("description"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Watchlist items
-export const watchlistItems = pgTable("watchlist_items", {
-  id: serial("id").primaryKey(),
-  watchlistId: integer("watchlist_id").notNull().references(() => watchlist.id, { onDelete: "cascade" }),
   symbol: text("symbol").notNull(),
   addedAt: timestamp("added_at").defaultNow(),
+  // Create a unique constraint to prevent duplicate symbols for the same user
+  // This acts as a composite primary key of userId + symbol
+}, (table) => {
+  return {
+    uniqUserSymbol: primaryKey({ columns: [table.userId, table.symbol] }),
+  };
 });
 
 // Portfolio for tracking owned stocks
@@ -126,14 +123,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   lastLogin: true,
 });
 
-export const insertWatchlistSchema = createInsertSchema(watchlist).pick({
+export const insertUserWatchlistItemSchema = createInsertSchema(userWatchlist).pick({
   userId: true,
-  name: true,
-  description: true,
-});
-
-export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).pick({
-  watchlistId: true,
   symbol: true,
 });
 
@@ -199,8 +190,8 @@ export const insertAchievementSchema = createInsertSchema(achievements).pick({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-export type Watchlist = typeof watchlist.$inferSelect;
-export type WatchlistItem = typeof watchlistItems.$inferSelect;
+export type InsertUserWatchlistItem = z.infer<typeof insertUserWatchlistItemSchema>;
+export type UserWatchlistItem = typeof userWatchlist.$inferSelect;
 
 export type Portfolio = typeof portfolio.$inferSelect;
 export type PortfolioPosition = typeof portfolioPositions.$inferSelect;

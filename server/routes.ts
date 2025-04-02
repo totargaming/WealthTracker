@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { setupStockAPI } from "./api";
+import { setupStockAPI, fetchStockQuote } from "./api";
 import { insertPortfolioPositionSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -13,86 +13,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up stock API routes
   setupStockAPI(app);
 
-  // Watchlist management
-  app.get("/api/watchlists", async (req, res) => {
+  // User Watchlist management (single watchlist per user)
+  app.get("/api/watchlist/items", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
     try {
-      const watchlists = await storage.getWatchlistsByUserId(req.user!.id);
-      res.json(watchlists);
+      const userId = req.user!.id;
+      const items = await storage.getUserWatchlistItems(userId);
+      
+      // Fetch stock quote for each item
+      const itemsWithDetails = await Promise.all(items.map(async (item) => {
+        try {
+          // Fetch basic quote info
+          const stockInfo = await fetchStockQuote(item.symbol);
+          return {
+            ...item,
+            name: stockInfo?.name,
+            price: stockInfo?.price,
+            change: stockInfo?.changesPercentage,
+          };
+        } catch (e) {
+          console.error(`Error fetching data for ${item.symbol}:`, e);
+          return item; // Return the original item without extra data
+        }
+      }));
+      
+      res.json(itemsWithDetails);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch watchlists" });
+      console.error("Error fetching watchlist items:", error);
+      res.status(500).json({ message: "Failed to fetch watchlist items" });
     }
   });
 
-  app.post("/api/watchlists", async (req, res) => {
+  app.post("/api/watchlist/items", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
     try {
-      const watchlist = await storage.createWatchlist({
-        userId: req.user!.id,
-        name: req.body.name,
-        description: req.body.description || "",
-      });
-      res.status(201).json(watchlist);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to create watchlist" });
-    }
-  });
-
-  app.get("/api/watchlists/:id", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    
-    try {
-      const watchlist = await storage.getWatchlistById(parseInt(req.params.id));
-      if (!watchlist || watchlist.userId !== req.user!.id) {
-        return res.status(404).json({ message: "Watchlist not found" });
+      const userId = req.user!.id;
+      const symbol = req.body.symbol;
+      
+      if (!symbol) {
+        return res.status(400).json({ message: "Symbol is required" });
       }
       
-      const items = await storage.getWatchlistItems(watchlist.id);
-      res.json({ ...watchlist, items });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch watchlist" });
-    }
-  });
-
-  app.post("/api/watchlists/:id/items", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    
-    try {
-      const watchlistId = parseInt(req.params.id);
-      const watchlist = await storage.getWatchlistById(watchlistId);
+      // Check if the symbol already exists in the user's watchlist
+      const items = await storage.getUserWatchlistItems(userId);
       
-      if (!watchlist || watchlist.userId !== req.user!.id) {
-        return res.status(404).json({ message: "Watchlist not found" });
+      if (items.some(item => item.symbol.toUpperCase() === symbol.toUpperCase())) {
+        return res.status(400).json({ message: "Symbol already in watchlist" });
       }
       
-      const item = await storage.addWatchlistItem({
-        watchlistId,
-        symbol: req.body.symbol,
+      const item = await storage.addUserWatchlistItem({
+        userId,
+        symbol: symbol.toUpperCase()
       });
       
       res.status(201).json(item);
     } catch (error) {
+      console.error("Error adding item to watchlist:", error);
       res.status(500).json({ message: "Failed to add stock to watchlist" });
     }
   });
-
-  app.delete("/api/watchlists/:watchlistId/items/:id", async (req, res) => {
+  
+  app.delete("/api/watchlist/items/:symbol", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
     try {
-      const watchlistId = parseInt(req.params.watchlistId);
-      const itemId = parseInt(req.params.id);
+      const userId = req.user!.id;
+      const symbol = req.params.symbol;
       
-      const watchlist = await storage.getWatchlistById(watchlistId);
-      if (!watchlist || watchlist.userId !== req.user!.id) {
-        return res.status(404).json({ message: "Watchlist not found" });
-      }
-      
-      await storage.removeWatchlistItem(itemId);
+      await storage.removeUserWatchlistItem(userId, symbol);
       res.status(204).send();
     } catch (error) {
+      console.error("Error removing item from watchlist:", error);
       res.status(500).json({ message: "Failed to remove stock from watchlist" });
     }
   });

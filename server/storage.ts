@@ -1,12 +1,11 @@
 import {
-  users, watchlist, watchlistItems, portfolio, portfolioPositions, screeningCriteria,
+  users, userWatchlist, portfolio, portfolioPositions, screeningCriteria,
   appSettings, apiLogs, restrictedStocks, featuredStocks, achievements,
-  type User, type InsertUser, type Watchlist,
-  type WatchlistItem, type Portfolio,
-  type PortfolioPosition, type ScreeningCriteria,
+  type User, type InsertUser, type UserWatchlistItem, type InsertUserWatchlistItem,
+  type Portfolio, type PortfolioPosition, type ScreeningCriteria,
   type AppSetting, type ApiLog, type RestrictedStock,
   type FeaturedStock, type Achievement,
-  insertWatchlistSchema, insertWatchlistItemSchema, insertPortfolioSchema,
+  insertUserWatchlistItemSchema, insertPortfolioSchema,
   insertPortfolioPositionSchema, insertScreeningCriteriaSchema, insertAppSettingSchema,
   insertApiLogSchema, insertRestrictedStockSchema, insertFeaturedStockSchema,
   insertAchievementSchema
@@ -29,8 +28,6 @@ declare module "express-session" {
 }
 
 // Define insert types from the schemas
-type InsertWatchlist = z.infer<typeof insertWatchlistSchema>;
-type InsertWatchlistItem = z.infer<typeof insertWatchlistItemSchema>;
 type InsertPortfolio = z.infer<typeof insertPortfolioSchema>;
 type InsertPortfolioPosition = z.infer<typeof insertPortfolioPositionSchema>;
 type InsertScreeningCriteria = z.infer<typeof insertScreeningCriteriaSchema>;
@@ -52,16 +49,10 @@ export interface IStorage {
   updateUser(userId: number, userData: Partial<InsertUser>): Promise<User>;
   deleteUser(userId: number): Promise<void>;
   
-  // Watchlist operations
-  getWatchlistsByUserId(userId: number): Promise<Watchlist[]>;
-  getWatchlistById(id: number): Promise<Watchlist | undefined>;
-  createWatchlist(watchlist: InsertWatchlist): Promise<Watchlist>;
-  deleteWatchlist(id: number): Promise<void>;
-  
-  // Watchlist item operations
-  getWatchlistItems(watchlistId: number): Promise<WatchlistItem[]>;
-  addWatchlistItem(item: InsertWatchlistItem): Promise<WatchlistItem>;
-  removeWatchlistItem(id: number): Promise<void>;
+  // User Watchlist operations (single watchlist per user)
+  getUserWatchlistItems(userId: number): Promise<UserWatchlistItem[]>;
+  addUserWatchlistItem(item: InsertUserWatchlistItem): Promise<UserWatchlistItem>;
+  removeUserWatchlistItem(userId: number, symbol: string): Promise<void>;
 
   // Portfolio operations
   getPortfoliosByUserId(userId: number): Promise<Portfolio[]>;
@@ -115,8 +106,7 @@ const MemoryStore = createMemoryStore(session);
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
-  private watchlists: Map<number, Watchlist>;
-  private watchlistItems: Map<number, WatchlistItem>;
+  private userWatchlistItems: Map<string, UserWatchlistItem>;
   private portfolios: Map<number, Portfolio>;
   private portfolioPositions: Map<number, PortfolioPosition>;
   private screeningCriterias: Map<number, ScreeningCriteria>;
@@ -142,8 +132,7 @@ export class MemStorage implements IStorage {
 
   constructor() {
     this.users = new Map();
-    this.watchlists = new Map();
-    this.watchlistItems = new Map();
+    this.userWatchlistItems = new Map();
     this.portfolios = new Map();
     this.portfolioPositions = new Map();
     this.screeningCriterias = new Map();
@@ -253,53 +242,28 @@ export class MemStorage implements IStorage {
     this.users.delete(userId);
   }
 
-  // Watchlist operations
-  async getWatchlistsByUserId(userId: number): Promise<Watchlist[]> {
-    return Array.from(this.watchlists.values()).filter(
-      (watchlist) => watchlist.userId === userId,
+  // User Watchlist operations (single watchlist per user)
+  async getUserWatchlistItems(userId: number): Promise<UserWatchlistItem[]> {
+    return Array.from(this.userWatchlistItems.values()).filter(
+      (item) => item.userId === userId,
     );
   }
 
-  async getWatchlistById(id: number): Promise<Watchlist | undefined> {
-    return this.watchlists.get(id);
-  }
-
-  async createWatchlist(watchlistData: InsertWatchlist): Promise<Watchlist> {
-    const id = this.watchlistId++;
+  async addUserWatchlistItem(item: InsertUserWatchlistItem): Promise<UserWatchlistItem> {
+    const key = `${item.userId}-${item.symbol}`;
     const timestamp = new Date();
-    const newWatchlist: Watchlist = { ...watchlistData, id, createdAt: timestamp };
-    this.watchlists.set(id, newWatchlist);
-    return newWatchlist;
-  }
-
-  async deleteWatchlist(id: number): Promise<void> {
-    // First delete all items in the watchlist
-    const items = await this.getWatchlistItems(id);
-    for (const item of items) {
-      await this.removeWatchlistItem(item.id);
-    }
-    
-    // Then delete the watchlist
-    this.watchlists.delete(id);
-  }
-
-  // Watchlist item operations
-  async getWatchlistItems(watchlistId: number): Promise<WatchlistItem[]> {
-    return Array.from(this.watchlistItems.values()).filter(
-      (item) => item.watchlistId === watchlistId,
-    );
-  }
-
-  async addWatchlistItem(item: InsertWatchlistItem): Promise<WatchlistItem> {
-    const id = this.watchlistItemId++;
-    const timestamp = new Date();
-    const newItem: WatchlistItem = { ...item, id, addedAt: timestamp };
-    this.watchlistItems.set(id, newItem);
+    const newItem: UserWatchlistItem = { 
+      ...item, 
+      id: this.watchlistItemId++,
+      addedAt: timestamp 
+    };
+    this.userWatchlistItems.set(key, newItem);
     return newItem;
   }
 
-  async removeWatchlistItem(id: number): Promise<void> {
-    this.watchlistItems.delete(id);
+  async removeUserWatchlistItem(userId: number, symbol: string): Promise<void> {
+    const key = `${userId}-${symbol}`;
+    this.userWatchlistItems.delete(key);
   }
 
   // Portfolio operations
@@ -628,6 +592,31 @@ export class PostgresStorage implements IStorage {
 
   async deleteUser(userId: number): Promise<void> {
     await this.dbInstance.delete(users).where(eq(users.id, userId));
+  }
+
+  // User Watchlist operations (single watchlist per user)
+  async getUserWatchlistItems(userId: number): Promise<UserWatchlistItem[]> {
+    return await this.dbInstance
+      .select()
+      .from(userWatchlist)
+      .where(eq(userWatchlist.userId, userId));
+  }
+
+  async addUserWatchlistItem(item: InsertUserWatchlistItem): Promise<UserWatchlistItem> {
+    const results = await this.dbInstance
+      .insert(userWatchlist)
+      .values(item)
+      .returning();
+    return results[0];
+  }
+
+  async removeUserWatchlistItem(userId: number, symbol: string): Promise<void> {
+    await this.dbInstance
+      .delete(userWatchlist)
+      .where(and(
+        eq(userWatchlist.userId, userId),
+        eq(userWatchlist.symbol, symbol)
+      ));
   }
 
   // Watchlist operations
