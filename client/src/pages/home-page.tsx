@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
-import MarketOverview from "@/components/markets/market-overview";
 import StockList from "@/components/stocks/stock-list";
 import StockDetails from "@/components/stocks/stock-details";
 import NewsList from "@/components/news/news-list";
@@ -34,14 +33,14 @@ export default function HomePage() {
   };
 
   return (
-    <div className="container flex min-h-screen bg-[#F4F5F7]">
+    <div className="container flex min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} userName={user?.fullName || ""} userRole={user?.role || ""} />
       
       <button 
-        className={`fixed left-5 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-[#DFE1E6] bg-white shadow-md lg:hidden`}
+        className={`fixed left-5 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-md lg:hidden`}
         onClick={toggleSidebar}
       >
-        <i className="fas fa-bars text-[#505F79]"></i>
+        <i className="fas fa-bars text-muted-foreground"></i>
       </button>
       
       <main className={`flex-grow overflow-x-hidden transition-all duration-300`}>
@@ -49,30 +48,28 @@ export default function HomePage() {
         
         <div className="p-6">
           <div className="mb-6 flex justify-between items-center">
-            <h2 className="text-2xl font-semibold text-[#172B4D] font-['Inter']">Market Overview</h2>
-            <button className="flex items-center gap-2 rounded border border-[#0052CC] bg-white px-3 py-2 text-sm font-medium text-[#0052CC]">
+            <h2 className="text-2xl font-semibold text-foreground font-['Inter']">Dashboard</h2>
+            <button className="flex items-center gap-2 rounded border border-primary bg-card px-3 py-2 text-sm font-medium text-primary">
               <i className="fas fa-sync-alt"></i>
               <span>Refresh</span>
             </button>
           </div>
           
-          <MarketOverview />
-          
-          <div className="mt-6 grid grid-cols-1 gap-6">
-            <div className="rounded-lg bg-white shadow">
-              <div className="flex items-center justify-between border-b border-[#DFE1E6] p-4">
-                <h3 className="text-base font-semibold text-[#172B4D] font-['Inter']">Your Watchlist</h3>
+          <div className="grid grid-cols-1 gap-6">
+            <div className="card">
+              <div className="card-header flex items-center justify-between">
+                <h3 className="card-title text-foreground">Your Watchlist</h3>
                 <div className="flex gap-2">
-                  <button className="flex h-8 w-8 items-center justify-center rounded border border-[#DFE1E6] text-[#505F79]">
+                  <button className="flex h-8 w-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-muted">
                     <i className="fas fa-plus"></i>
                   </button>
-                  <button className="flex h-8 w-8 items-center justify-center rounded border border-[#DFE1E6] text-[#505F79]">
+                  <button className="flex h-8 w-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-muted">
                     <i className="fas fa-cog"></i>
                   </button>
                 </div>
               </div>
               
-              <div className="p-4">
+              <div className="card-content">
                 <StockList 
                   watchlistId={defaultWatchlist?.id} 
                   onSelectStock={(symbol) => setSelectedStock(symbol)} 
@@ -81,35 +78,35 @@ export default function HomePage() {
               </div>
             </div>
             
-            <div className="rounded-lg bg-white shadow">
-              <div className="flex items-center justify-between border-b border-[#DFE1E6] p-4">
-                <h3 className="text-base font-semibold text-[#172B4D] font-['Inter']">Stock Analysis</h3>
-                <button className="flex items-center gap-2 rounded border border-[#DFE1E6] bg-white px-3 py-1 text-sm font-medium text-[#505F79]">
+            <div className="card">
+              <div className="card-header flex items-center justify-between">
+                <h3 className="card-title text-foreground">Stock Analysis</h3>
+                <button className="flex items-center gap-2 rounded border border-border bg-card px-3 py-1 text-sm font-medium text-muted-foreground hover:bg-muted">
                   <i className="fas fa-external-link-alt"></i>
                   <span>Full Report</span>
                 </button>
               </div>
               
-              <div className="p-4">
+              <div className="card-content">
                 {selectedStock && <StockDetails symbol={selectedStock} />}
               </div>
             </div>
             
-            <div className="rounded-lg bg-white shadow">
-              <div className="flex items-center justify-between border-b border-[#DFE1E6] p-4">
-                <h3 className="text-base font-semibold text-[#172B4D] font-['Inter']">Latest Financial News</h3>
-                <button className="flex items-center gap-2 rounded border border-[#DFE1E6] bg-white px-3 py-1 text-sm font-medium text-[#505F79]">
+            <div className="card">
+              <div className="card-header flex items-center justify-between">
+                <h3 className="card-title text-foreground">Latest Financial News</h3>
+                <button className="flex items-center gap-2 rounded border border-border bg-card px-3 py-1 text-sm font-medium text-muted-foreground hover:bg-muted">
                   <i className="fas fa-filter"></i>
                   <span>Filter</span>
                 </button>
               </div>
               
-              <div className="p-4">
+              <div className="card-content">
                 <NewsList symbol={selectedStock} limit={4} />
               </div>
               
-              <div className="border-t border-[#DFE1E6] p-3 text-center">
-                <a href="#" className="text-sm text-[#0052CC]">View all news</a>
+              <div className="border-t border-border p-3 text-center">
+                <a href="#" className="text-sm text-primary hover:underline">View all news</a>
               </div>
             </div>
           </div>
