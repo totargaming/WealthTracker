@@ -10,7 +10,7 @@ import {
   insertApiLogSchema, insertRestrictedStockSchema, insertFeaturedStockSchema,
   insertAchievementSchema
 } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { Pool } from '@neondatabase/serverless';
 import { db } from './db';
 import connectPg from "connect-pg-simple";
@@ -158,14 +158,8 @@ export class MemStorage implements IStorage {
       checkPeriod: 86400000, // 24 hours
     });
     
-    // Create admin user
-    this.createUser({
-      username: "admin",
-      password: "$2b$10$TQg7WM94HBN1DF1vq3ies.jD6CxZ6k8rkgXziBEKBwF8TlI6xGMHe", // "admin123"
-      email: "admin@fintrack.com",
-      fullName: "Admin User",
-      role: "admin",
-    });
+    // Create admin user - the hash will be generated in the method below
+    this.createInitialAdminUser();
   }
 
   // User operations
@@ -191,6 +185,28 @@ export class MemStorage implements IStorage {
     const newUser: User = { ...user, id, createdAt: timestamp };
     this.users.set(id, newUser);
     return newUser;
+  }
+
+  async createInitialAdminUser() {
+    try {
+      const adminExists = await this.getUserByUsername("admin");
+      if (!adminExists) {
+        // Use the hashPassword function from auth-utils.ts
+        const { hashPassword } = await import('./auth-utils');
+        const hashedPassword = await hashPassword("admin123");
+        
+        await this.createUser({
+          username: "admin",
+          password: hashedPassword,
+          email: "admin@fintrack.com",
+          fullName: "Admin User",
+          role: "admin",
+        });
+        console.log("Created admin user with properly hashed password");
+      }
+    } catch (error) {
+      console.error("Error creating admin user:", error);
+    }
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -526,13 +542,18 @@ export class PostgresStorage implements IStorage {
     try {
       const adminExists = await this.getUserByUsername("admin");
       if (!adminExists) {
+        // Use the hashPassword function from auth-utils.ts
+        const { hashPassword } = await import('./auth-utils');
+        const hashedPassword = await hashPassword("admin123");
+        
         await this.createUser({
           username: "admin",
-          password: "$2b$10$TQg7WM94HBN1DF1vq3ies.jD6CxZ6k8rkgXziBEKBwF8TlI6xGMHe", // "admin123"
+          password: hashedPassword,
           email: "admin@fintrack.com",
           fullName: "Admin User",
           role: "admin",
         });
+        console.log("Created admin user with properly hashed password");
       }
     } catch (error) {
       console.error("Error checking/creating admin user:", error);
@@ -762,7 +783,7 @@ export class PostgresStorage implements IStorage {
     return await this.dbInstance
       .select()
       .from(apiLogs)
-      .orderBy(sql`apiLogs.request_time DESC`)
+      .orderBy(desc(apiLogs.requestTime))
       .limit(limit);
   }
 
@@ -771,7 +792,7 @@ export class PostgresStorage implements IStorage {
       .select()
       .from(apiLogs)
       .where(eq(apiLogs.userId, userId))
-      .orderBy(sql`apiLogs.request_time DESC`)
+      .orderBy(desc(apiLogs.requestTime))
       .limit(limit);
   }
 
@@ -799,7 +820,7 @@ export class PostgresStorage implements IStorage {
       .select()
       .from(featuredStocks)
       .where(
-        sql`featuredStocks.end_date IS NULL OR featuredStocks.end_date > ${now}`
+        sql`${featuredStocks.endDate} IS NULL OR ${featuredStocks.endDate} > ${now}`
       );
   }
 
@@ -838,7 +859,7 @@ export class PostgresStorage implements IStorage {
       .select()
       .from(achievements)
       .where(eq(achievements.userId, userId))
-      .orderBy(sql`achievements.achieved_at DESC`);
+      .orderBy(desc(achievements.achievedAt));
   }
 }
 

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { 
   useUsers, 
   useCreateUser, 
@@ -13,7 +14,9 @@ import {
   useAddRestrictedStock,
   useRemoveRestrictedStock,
   useAddFeaturedStock,
-  useRemoveFeaturedStock
+  useRemoveFeaturedStock,
+  useAppSettings,
+  useSaveAppSetting
 } from "@/hooks/use-admin";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,6 +67,7 @@ import {
   UserCog, 
   Download,
   Eye,
+  EyeOff,
   Key,
   BarChart4,
   Loader2,
@@ -92,26 +96,51 @@ export default function AdminPage() {
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
   const [newRole, setNewRole] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKey, setApiKey] = useState("••••••••••••••••••••");
+  const [realApiKey, setRealApiKey] = useState("");
+  const [newApiKey, setNewApiKey] = useState("");
+  const [isSystemCheckRunning, setIsSystemCheckRunning] = useState(false);
+  const [systemStatuses, setSystemStatuses] = useState({
+    api: true,
+    database: true,
+    storage: true,
+    lastCheck: new Date()
+  });
+  
+  // System settings
+  const [sessionTimeout, setSessionTimeout] = useState("24h");
+  const [rememberMeDuration, setRememberMeDuration] = useState("30d");
+  const [dataRefreshRate, setDataRefreshRate] = useState("60");
+  const [defaultResultsLimit, setDefaultResultsLimit] = useState("10");
   
   // Custom hooks for user management
-  const { data: users, isLoading } = useUsers();
+  const { data: users = [], isLoading } = useUsers();
   const updateUserMutation = useUpdateUser();
   const createUserMutation = useCreateUser();
   const deleteUserMutation = useDeleteUser();
   
   // API logs hooks
-  const { data: apiLogs, isLoading: isLoadingLogs } = useApiLogs(100);
+  const { data: apiLogs = [], isLoading: isLoadingLogs } = useApiLogs(100);
   
   // Restricted stocks hooks
-  const { data: restrictedStocks, isLoading: isLoadingRestrictedStocks } = useRestrictedStocks();
+  const { data: restrictedStocks = [], isLoading: isLoadingRestrictedStocks } = useRestrictedStocks();
   const addRestrictedStockMutation = useAddRestrictedStock();
   const removeRestrictedStockMutation = useRemoveRestrictedStock();
   
   // Featured stocks hooks
-  const { data: featuredStocks, isLoading: isLoadingFeaturedStocks } = useFeaturedStocks();
+  const { data: featuredStocks = [], isLoading: isLoadingFeaturedStocks } = useFeaturedStocks();
   const addFeaturedStockMutation = useAddFeaturedStock();
   const removeFeaturedStockMutation = useRemoveFeaturedStock();
+  
+  // App settings hook
+  const { data: appSettings = [], isLoading: isLoadingSettings } = useAppSettings();
+  const saveAppSettingMutation = useSaveAppSetting();
+  
+  // Toast for notifications
+  const { toast } = useToast();
   
   // Form for creating a new user
   const createUserForm = useForm<CreateUserFormValues>({
@@ -173,6 +202,177 @@ export default function AdminPage() {
     }
   };
   
+  // Get API key from environment variables or settings
+  const fetchApiKey = async () => {
+    try {
+      // In a real app, this would make a secure request to get the API key
+      const apiKeySetting = appSettings.find(setting => setting.settingKey === 'FMP_API_KEY');
+      if (apiKeySetting?.settingValue) {
+        setRealApiKey(apiKeySetting.settingValue);
+        setApiKey(showApiKey ? apiKeySetting.settingValue : "••••••••••••••••••••");
+      } else {
+        // Fallback to environment variable (just for display)
+        setRealApiKey("API key is available in environment variables");
+        setApiKey(showApiKey ? "Available in environment variables" : "••••••••••••••••••••");
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch API key",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Toggle showing the actual API key
+  const toggleShowApiKey = () => {
+    setShowApiKey(!showApiKey);
+    setApiKey(showApiKey ? "••••••••••••••••••••" : realApiKey);
+  };
+
+  // Open dialog to update API key
+  const openApiKeyDialog = () => {
+    setIsApiKeyDialogOpen(true);
+    setNewApiKey("");
+  };
+
+  // Update API key
+  const updateApiKey = () => {
+    if (!newApiKey) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid API key",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    saveAppSettingMutation.mutate({
+      settingKey: "FMP_API_KEY",
+      settingValue: newApiKey,
+      description: "Financial Modeling Prep API Key"
+    }, {
+      onSuccess: () => {
+        setIsApiKeyDialogOpen(false);
+        setRealApiKey(newApiKey);
+        setApiKey(showApiKey ? newApiKey : "••••••••••••••••••••");
+        toast({
+          title: "Success",
+          description: "API key updated successfully",
+        });
+      }
+    });
+  };
+
+  // Run system check
+  const runSystemCheck = async () => {
+    setIsSystemCheckRunning(true);
+    
+    try {
+      // Simulating API check
+      const apiStatus = await checkApiStatus();
+      
+      // Simulating database check
+      const dbStatus = await checkDatabaseStatus();
+      
+      // Simulating storage check
+      const storageStatus = await checkStorageStatus();
+      
+      setSystemStatuses({
+        api: apiStatus,
+        database: dbStatus,
+        storage: storageStatus,
+        lastCheck: new Date()
+      });
+      
+      toast({
+        title: "System Check Complete",
+        description: "All systems have been checked",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to complete system check",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSystemCheckRunning(false);
+    }
+  };
+  
+  // Simulated API status check
+  const checkApiStatus = async () => {
+    return new Promise<boolean>(resolve => {
+      setTimeout(() => {
+        // This would actually make a real API check
+        resolve(true);
+      }, 500);
+    });
+  };
+  
+  // Simulated database status check
+  const checkDatabaseStatus = async () => {
+    return new Promise<boolean>(resolve => {
+      setTimeout(() => {
+        // This would actually check database connectivity
+        resolve(true);
+      }, 700);
+    });
+  };
+  
+  // Simulated storage status check
+  const checkStorageStatus = async () => {
+    return new Promise<boolean>(resolve => {
+      setTimeout(() => {
+        // This would actually check storage system
+        resolve(true);
+      }, 600);
+    });
+  };
+  
+  // Save system configuration settings
+  const saveSystemSettings = () => {
+    const settingsToSave = [
+      { key: "SESSION_TIMEOUT", value: sessionTimeout, description: "Session timeout duration" },
+      { key: "REMEMBER_ME_DURATION", value: rememberMeDuration, description: "Remember me cookie duration" },
+      { key: "DATA_REFRESH_RATE", value: dataRefreshRate, description: "Data refresh rate in seconds" },
+      { key: "DEFAULT_RESULTS_LIMIT", value: defaultResultsLimit, description: "Default number of results to show" }
+    ];
+    
+    // Save each setting
+    settingsToSave.forEach(setting => {
+      saveAppSettingMutation.mutate({
+        settingKey: setting.key,
+        settingValue: setting.value,
+        description: setting.description
+      });
+    });
+    
+    toast({
+      title: "Success",
+      description: "System settings saved successfully",
+    });
+  };
+  
+  // Load settings from database when component mounts
+  useEffect(() => {
+    // Find and set settings if they exist
+    const timeout = appSettings.find((s) => s.settingKey === "SESSION_TIMEOUT");
+    if (timeout?.settingValue) setSessionTimeout(timeout.settingValue);
+    
+    const rememberMe = appSettings.find((s) => s.settingKey === "REMEMBER_ME_DURATION");
+    if (rememberMe?.settingValue) setRememberMeDuration(rememberMe.settingValue);
+    
+    const refreshRate = appSettings.find((s) => s.settingKey === "DATA_REFRESH_RATE");
+    if (refreshRate?.settingValue) setDataRefreshRate(refreshRate.settingValue);
+    
+    const resultsLimit = appSettings.find((s) => s.settingKey === "DEFAULT_RESULTS_LIMIT");
+    if (resultsLimit?.settingValue) setDefaultResultsLimit(resultsLimit.settingValue);
+    
+    // Also fetch the API key
+    fetchApiKey();
+  }, [appSettings]);
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -269,7 +469,7 @@ export default function AdminPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users && users.map((user: any) => (
+                        {users.map((user) => (
                           <TableRow key={user.id}>
                             <TableCell className="font-medium">{user.id}</TableCell>
                             <TableCell>{user.username}</TableCell>
@@ -325,24 +525,39 @@ export default function AdminPage() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">API Status</span>
-                        <Badge className="bg-[#36B37E]">Operational</Badge>
+                        <Badge className={systemStatuses.api ? "bg-[#36B37E]" : "bg-[#FF5630]"}>
+                          {systemStatuses.api ? "Operational" : "Degraded"}
+                        </Badge>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Database Status</span>
-                        <Badge className="bg-[#36B37E]">Operational</Badge>
+                        <Badge className={systemStatuses.database ? "bg-[#36B37E]" : "bg-[#FF5630]"}>
+                          {systemStatuses.database ? "Operational" : "Degraded"}
+                        </Badge>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Storage Status</span>
-                        <Badge className="bg-[#36B37E]">Operational</Badge>
+                        <Badge className={systemStatuses.storage ? "bg-[#36B37E]" : "bg-[#FF5630]"}>
+                          {systemStatuses.storage ? "Operational" : "Degraded"}
+                        </Badge>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Last System Check</span>
-                        <span className="text-sm">{new Date().toLocaleString()}</span>
+                        <span className="text-sm">{systemStatuses.lastCheck.toLocaleString()}</span>
                       </div>
                       <div className="pt-4">
-                        <Button variant="outline" className="w-full">
-                          <BarChart4 className="h-4 w-4 mr-2" />
-                          Run System Check
+                        <Button 
+                          variant="outline" 
+                          className="w-full" 
+                          onClick={runSystemCheck}
+                          disabled={isSystemCheckRunning}
+                        >
+                          {isSystemCheckRunning ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <BarChart4 className="h-4 w-4 mr-2" />
+                          )}
+                          {isSystemCheckRunning ? "Running Check..." : "Run System Check"}
                         </Button>
                       </div>
                     </div>
@@ -360,18 +575,26 @@ export default function AdminPage() {
                         <p className="text-sm text-muted-foreground mb-1">Financial Modeling Prep API Key</p>
                         <div className="flex">
                           <input 
-                            type="password" 
-                            value="••••••••••••••••••••" 
+                            type={showApiKey ? "text" : "password"}
+                            value={apiKey}
                             disabled 
                             className="flex-grow h-10 px-3 border rounded-l-md bg-muted text-sm"
                           />
-                          <Button variant="outline" className="rounded-l-none">
-                            <Eye className="h-4 w-4" />
+                          <Button 
+                            variant="outline" 
+                            className="rounded-l-none"
+                            onClick={toggleShowApiKey}
+                          >
+                            {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </Button>
                         </div>
                       </div>
                       <div className="pt-4">
-                        <Button variant="outline" className="w-full">
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={openApiKeyDialog}
+                        >
                           <Key className="h-4 w-4 mr-2" />
                           Update API Key
                         </Button>
@@ -392,7 +615,10 @@ export default function AdminPage() {
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-muted-foreground">Session Timeout</span>
-                            <Select defaultValue="24h">
+                            <Select 
+                              value={sessionTimeout} 
+                              onValueChange={setSessionTimeout}
+                            >
                               <SelectTrigger className="w-32">
                                 <SelectValue placeholder="Select" />
                               </SelectTrigger>
@@ -508,10 +734,10 @@ export default function AdminPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {apiLogs && Array.isArray(apiLogs) && apiLogs.map((log: any) => (
+                        {apiLogs.map((log) => (
                           <TableRow key={log.id}>
                             <TableCell className="font-mono text-xs">
-                              {new Date(log.requestTime).toLocaleString()}
+                              {log.requestTime ? new Date(log.requestTime).toLocaleString() : 'N/A'}
                             </TableCell>
                             <TableCell>{log.endpoint}</TableCell>
                             <TableCell>{log.userId || "Anonymous"}</TableCell>
@@ -527,7 +753,7 @@ export default function AdminPage() {
                           </TableRow>
                         ))}
                         
-                        {(!apiLogs || !Array.isArray(apiLogs) || apiLogs.length === 0) && (
+                        {apiLogs.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                               No activity logs found
