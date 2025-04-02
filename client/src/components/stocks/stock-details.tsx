@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useStockQuote, useStockProfile, useStockHistorical } from "@/hooks/use-stocks";
+import { useStockQuote, useStockProfile, useStockHistorical, useIsInWatchlist } from "@/hooks/use-stocks";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import StockChart from "@/components/charts/stock-chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +14,7 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
+import { Star, StarOff, Plus } from "lucide-react";
 
 interface StockDetailsProps {
   symbol: string;
@@ -19,12 +23,60 @@ interface StockDetailsProps {
 
 export default function StockDetails({ symbol, onSymbolChange }: StockDetailsProps) {
   const [activeTab, setActiveTab] = useState("chart");
+  const { toast } = useToast();
   
   const { data: stockData, isLoading: isLoadingStock, error: stockError } = useStockQuote(symbol);
   const { data: stockProfile, isLoading: isLoadingProfile, error: profileError } = useStockProfile(symbol);
   const { data: historicalData, isLoading: isLoadingHistorical, error: historicalError } = useStockHistorical(symbol);
+  const { isInWatchlist } = useIsInWatchlist(symbol);
   
   const isLoading = isLoadingStock || isLoadingProfile || isLoadingHistorical;
+  
+  // Add to watchlist mutation
+  const addToWatchlistMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/watchlist/items", { symbol });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Added to Watchlist",
+        description: `${symbol} has been added to your watchlist`,
+      });
+      // Invalidate both watchlist query caches
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to add to watchlist",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Remove from watchlist mutation
+  const removeFromWatchlistMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/watchlist/items/${symbol}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Removed from Watchlist",
+        description: `${symbol} has been removed from your watchlist`,
+      });
+      // Invalidate both watchlist query caches
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to remove from watchlist",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
   
   // Check if any of the errors are rate limit errors
   const isRateLimitError = 
@@ -108,14 +160,48 @@ export default function StockDetails({ symbol, onSymbolChange }: StockDetailsPro
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
-        <div>
-          <h2 className="text-xl md:text-2xl font-semibold">{stockProfile?.companyName || stockData.name}</h2>
-          <p className="text-sm text-muted-foreground">
-            {symbol} • {stockProfile?.exchange || stockData.exchange || 'N/A'}
-          </p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h2 className="text-xl md:text-2xl font-semibold flex items-center gap-2">
+              {stockProfile?.companyName || stockData.name}
+              {isInWatchlist && (
+                <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                  <Star className="h-3 w-3 mr-1 fill-yellow-500" /> Watchlist
+                </Badge>
+              )}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {symbol} • {stockProfile?.exchange || stockData.exchange || 'N/A'}
+            </p>
+          </div>
         </div>
         <div className="mt-2 md:mt-0 text-right">
-          <div className="text-2xl font-semibold font-mono">${stockData.price?.toFixed(2) || '0.00'}</div>
+          <div className="flex items-center justify-end gap-2 mb-1">
+            <div className="text-2xl font-semibold font-mono">${stockData.price?.toFixed(2) || '0.00'}</div>
+            {isInWatchlist ? (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-yellow-500 border-yellow-500 hover:bg-yellow-500/10"
+                onClick={() => removeFromWatchlistMutation.mutate()}
+                disabled={removeFromWatchlistMutation.isPending}
+              >
+                <StarOff className="h-4 w-4 mr-1" />
+                Remove
+              </Button>
+            ) : (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-primary hover:bg-primary/10"
+                onClick={() => addToWatchlistMutation.mutate()}
+                disabled={addToWatchlistMutation.isPending}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add to Watchlist
+              </Button>
+            )}
+          </div>
           <div className={`flex items-center ${(stockData.change || 0) > 0 ? 'text-green-500' : 'text-red-500'} text-sm font-medium ${!stockProfile ? 'justify-start md:justify-end' : 'justify-end'}`}>
             {(stockData.change || 0) > 0 ? '▲' : '▼'}
             <span className="ml-1">

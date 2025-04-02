@@ -1,6 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
+export function useWatchlistItems() {
+  return useQuery({
+    queryKey: ["/api/watchlist/items"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/watchlist/items");
+      return await res.json();
+    },
+  });
+}
+
+export function useIsInWatchlist(symbol: string) {
+  const { data: watchlistItems = [] } = useWatchlistItems();
+  
+  // Check if the symbol exists in the watchlist
+  const isInWatchlist = watchlistItems.some((item: any) => 
+    item.symbol.toUpperCase() === symbol.toUpperCase()
+  );
+  
+  return { isInWatchlist, watchlistItems };
+}
+
 export function useStockQuote(symbol: string) {
   return useQuery({
     queryKey: ["/api/stocks/quote", symbol],
