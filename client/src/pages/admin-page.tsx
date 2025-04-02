@@ -2,54 +2,134 @@ import { useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from "@/hooks/use-admin";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Loader2, Plus, Pencil, Trash2, UserCog, Download, Eye, Key, Search } from "lucide-react";
+
+// Form validation schema for creating a new user
+const createUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  fullName: z.string().min(2, "Full name is required"),
+  role: z.string().default("user"),
+  address: z.string().optional(),
+  darkMode: z.boolean().default(false),
+});
+
+type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
 export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, isAdmin } = useAuth();
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newRole, setNewRole] = useState("");
   
-  // Fetch all users
-  const { data: users, isLoading } = useQuery({
-    queryKey: ["/api/admin/users"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/admin/users");
-      return await res.json();
+  // Custom hooks for user management
+  const { data: users, isLoading } = useUsers();
+  const updateUserMutation = useUpdateUser();
+  const createUserMutation = useCreateUser();
+  const deleteUserMutation = useDeleteUser();
+  
+  // Form for creating a new user
+  const createUserForm = useForm<CreateUserFormValues>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      email: "",
+      fullName: "",
+      role: "user",
+      address: "",
+      darkMode: false,
     },
   });
   
-  // Update user role mutation
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: number, role: string }) => {
-      const res = await apiRequest("PUT", `/api/admin/users/${userId}`, { role });
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      setIsRoleDialogOpen(false);
-    },
-  });
+  // Handle creating a new user
+  const onSubmitCreateUser = (values: CreateUserFormValues) => {
+    createUserMutation.mutate(values, {
+      onSuccess: () => {
+        setIsCreateUserDialogOpen(false);
+        createUserForm.reset();
+      }
+    });
+  };
   
+  // Handle opening role change dialog
   const openRoleDialog = (user: any) => {
     setSelectedUser(user);
     setNewRole(user.role);
     setIsRoleDialogOpen(true);
   };
   
+  // Handle role change
   const handleRoleChange = () => {
     if (selectedUser && newRole) {
-      updateRoleMutation.mutate({ userId: selectedUser.id, role: newRole });
+      updateUserMutation.mutate({ 
+        id: selectedUser.id, 
+        userData: { role: newRole } 
+      });
+      setIsRoleDialogOpen(false);
+    }
+  };
+  
+  // Handle initiating user deletion
+  const handleDeleteUser = (user: any) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  // Handle confirming user deletion
+  const confirmDeleteUser = () => {
+    if (selectedUser) {
+      deleteUserMutation.mutate(selectedUser.id, {
+        onSuccess: () => {
+          setIsDeleteDialogOpen(false);
+          setSelectedUser(null);
+        }
+      });
     }
   };
   
@@ -114,10 +194,20 @@ export default function AdminPage() {
                       <CardTitle>User Management</CardTitle>
                       <CardDescription>Manage user accounts and permissions</CardDescription>
                     </div>
-                    <Button variant="outline">
-                      <i className="fas fa-download mr-2"></i>
-                      Export
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="default" 
+                        className="bg-[#36B37E] hover:bg-[#2d9567]"
+                        onClick={() => setIsCreateUserDialogOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add User
+                      </Button>
+                      <Button variant="outline">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -157,14 +247,23 @@ export default function AdminPage() {
                               {new Date(user.createdAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => openRoleDialog(user)}
-                              >
-                                <i className="fas fa-user-cog mr-1"></i>
-                                Change Role
-                              </Button>
+                              <div className="flex justify-end gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => openRoleDialog(user)}
+                                >
+                                  <UserCog className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleDeleteUser(user)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -429,6 +528,161 @@ export default function AdminPage() {
         </div>
       </main>
       
+      {/* Create User dialog */}
+      <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>
+              Add a new user to the system. All fields are required except Address.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...createUserForm}>
+            <form onSubmit={createUserForm.handleSubmit(onSubmitCreateUser)} className="space-y-4 pt-4">
+              <FormField
+                control={createUserForm.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input placeholder="johndoe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createUserForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={createUserForm.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={createUserForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="john.doe@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={createUserForm.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createUserForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123 Main St, Anytown, USA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createUserForm.control}
+                name="darkMode"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Enable Dark Mode</FormLabel>
+                      <FormDescription>
+                        User will see the app in dark mode by default.
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsCreateUserDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={createUserMutation.isPending}
+                >
+                  {createUserMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating User...
+                    </>
+                  ) : "Create User"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
       {/* Role change dialog */}
       <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
         <DialogContent>
@@ -453,9 +707,9 @@ export default function AdminPage() {
             <Button variant="outline" onClick={() => setIsRoleDialogOpen(false)}>Cancel</Button>
             <Button 
               onClick={handleRoleChange}
-              disabled={updateRoleMutation.isPending}
+              disabled={updateUserMutation.isPending}
             >
-              {updateRoleMutation.isPending ? (
+              {updateUserMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Updating...
@@ -465,6 +719,34 @@ export default function AdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Delete user confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the user {selectedUser?.username} and all associated data.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteUser}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteUserMutation.isPending}
+            >
+              {deleteUserMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : "Delete User"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

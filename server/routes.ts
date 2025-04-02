@@ -356,10 +356,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const userId = parseInt(req.params.id);
-      const user = await storage.updateUserRole(userId, req.body.role);
+      
+      // Handle role updates
+      if (req.body.role) {
+        const user = await storage.updateUserRole(userId, req.body.role);
+        return res.json(user);
+      }
+      
+      // Handle other user data updates
+      const updateData: Partial<z.infer<typeof insertUserSchema>> = {};
+      
+      if (req.body.email !== undefined) updateData.email = req.body.email;
+      if (req.body.fullName !== undefined) updateData.fullName = req.body.fullName;
+      if (req.body.avatar !== undefined) updateData.avatar = req.body.avatar;
+      if (req.body.address !== undefined) updateData.address = req.body.address;
+      
+      const user = await storage.updateUser(userId, updateData);
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+  
+  app.post("/api/admin/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user!.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    try {
+      // Validate required fields
+      if (!req.body.username || !req.body.password || !req.body.email || !req.body.fullName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(req.body.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+      
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(req.body.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      
+      const user = await storage.createUser({
+        username: req.body.username,
+        password: req.body.password, // Will be hashed in storage.createUser
+        email: req.body.email,
+        fullName: req.body.fullName,
+        role: req.body.role || 'user',
+        address: req.body.address || null,
+        avatar: req.body.avatar || null,
+        darkMode: req.body.darkMode || false
+      });
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+  
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user!.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    try {
+      const userId = parseInt(req.params.id);
+      
+      // Don't allow admins to delete themselves
+      if (userId === req.user!.id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+      
+      await storage.deleteUser(userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
   
