@@ -22,7 +22,7 @@ export const userWatchlist = pgTable("user_watchlist", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   symbol: text("symbol").notNull(),
-  addedAt: timestamp("added_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
   // Create a unique constraint to prevent duplicate symbols for the same user
   // This acts as a composite primary key of userId + symbol
 }, (table) => {

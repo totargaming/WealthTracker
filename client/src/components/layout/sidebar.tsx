@@ -42,7 +42,7 @@ export default function Sidebar({ isOpen, userName, userRole }: SidebarProps) {
 
   return (
     <aside 
-      className={`bg-card border-r border-border w-64 flex flex-col transition-all duration-300 fixed h-full z-40 lg:static ${
+      className={`bg-card border-r border-border w-64 flex flex-col transition-all duration-300 fixed top-0 bottom-0 h-screen z-40 lg:static ${
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       }`}
     >

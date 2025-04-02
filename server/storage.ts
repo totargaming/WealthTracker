@@ -220,10 +220,10 @@ export class MemStorage implements IStorage {
   }
 
   async deleteUser(userId: number): Promise<void> {
-    // Delete user's watchlists
-    const watchlists = await this.getWatchlistsByUserId(userId);
-    for (const watchlist of watchlists) {
-      await this.deleteWatchlist(watchlist.id);
+    // Delete user's watchlist items (single watchlist per user)
+    const watchlistItems = await this.getUserWatchlistItems(userId);
+    for (const item of watchlistItems) {
+      await this.removeUserWatchlistItem(userId, item.symbol);
     }
     
     // Delete user's portfolios
@@ -255,7 +255,7 @@ export class MemStorage implements IStorage {
     const newItem: UserWatchlistItem = { 
       ...item, 
       id: this.watchlistItemId++,
-      addedAt: timestamp 
+      createdAt: timestamp 
     };
     this.userWatchlistItems.set(key, newItem);
     return newItem;
@@ -438,7 +438,7 @@ export class MemStorage implements IStorage {
     const newStock: RestrictedStock = { 
       ...stock, 
       id, 
-      addedAt: timestamp
+      addedAt: timestamp // This field is still named addedAt in the restrictedStocks schema
     };
     this.restrictedStocksList.set(id, newStock);
     return newStock;
@@ -591,6 +591,8 @@ export class PostgresStorage implements IStorage {
   }
 
   async deleteUser(userId: number): Promise<void> {
+    // Note: The database has cascading deletes set up for all tables that reference users,
+    // so we just need to delete the user record and everything else will be automatically deleted.
     await this.dbInstance.delete(users).where(eq(users.id, userId));
   }
 
@@ -619,54 +621,8 @@ export class PostgresStorage implements IStorage {
       ));
   }
 
-  // Watchlist operations
-  async getWatchlistsByUserId(userId: number): Promise<Watchlist[]> {
-    return await this.dbInstance
-      .select()
-      .from(watchlist)
-      .where(eq(watchlist.userId, userId));
-  }
-
-  async getWatchlistById(id: number): Promise<Watchlist | undefined> {
-    const results = await this.dbInstance
-      .select()
-      .from(watchlist)
-      .where(eq(watchlist.id, id))
-      .limit(1);
-    return results[0];
-  }
-
-  async createWatchlist(watchlistData: InsertWatchlist): Promise<Watchlist> {
-    const results = await this.dbInstance
-      .insert(watchlist)
-      .values(watchlistData)
-      .returning();
-    return results[0];
-  }
-
-  async deleteWatchlist(id: number): Promise<void> {
-    await this.dbInstance.delete(watchlist).where(eq(watchlist.id, id));
-  }
-
-  // Watchlist item operations
-  async getWatchlistItems(watchlistId: number): Promise<WatchlistItem[]> {
-    return await this.dbInstance
-      .select()
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, watchlistId));
-  }
-
-  async addWatchlistItem(item: InsertWatchlistItem): Promise<WatchlistItem> {
-    const results = await this.dbInstance
-      .insert(watchlistItems)
-      .values(item)
-      .returning();
-    return results[0];
-  }
-
-  async removeWatchlistItem(id: number): Promise<void> {
-    await this.dbInstance.delete(watchlistItems).where(eq(watchlistItems.id, id));
-  }
+  // Note: The multi-watchlist functionality has been replaced with a single watchlist per user
+  // The corresponding functions for the old multi-watchlist system have been removed
 
   // Portfolio operations
   async getPortfoliosByUserId(userId: number): Promise<Portfolio[]> {
