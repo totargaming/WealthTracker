@@ -98,10 +98,18 @@ export function setupStockAPI(app: Express) {
       const errorMessage = error.response?.data?.error || error.message;
       await logApiRequest(userId, `/api/stocks/quote/${symbol}`, false, responseTime, errorMessage);
       
-      res.status(500).json({
-        error: 'Failed to fetch stock quote',
-        details: errorMessage
-      });
+      // Check if it's a rate limit error
+      if (error.response?.status === 429 || errorMessage?.includes('Limit Reach')) {
+        res.status(429).json({
+          error: 'API rate limit reached',
+          message: 'We have reached the maximum number of requests to our data provider. Please try again later.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Failed to fetch stock quote',
+          details: errorMessage
+        });
+      }
     }
   });
 
@@ -128,10 +136,18 @@ export function setupStockAPI(app: Express) {
       const errorMessage = error.response?.data?.error || error.message;
       await logApiRequest(userId, `/api/stocks/profile/${symbol}`, false, responseTime, errorMessage);
       
-      res.status(500).json({
-        error: 'Failed to fetch company profile',
-        details: errorMessage
-      });
+      // Check if it's a rate limit error
+      if (error.response?.status === 429 || errorMessage?.includes('Limit Reach')) {
+        res.status(429).json({
+          error: 'API rate limit reached',
+          message: 'We have reached the maximum number of requests to our data provider. Please try again later.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Failed to fetch company profile',
+          details: errorMessage
+        });
+      }
     }
   });
 
@@ -157,10 +173,18 @@ export function setupStockAPI(app: Express) {
       const errorMessage = error.response?.data?.error || error.message;
       await logApiRequest(userId, `/api/stocks/historical/${symbol}`, false, responseTime, errorMessage);
       
-      res.status(500).json({
-        error: 'Failed to fetch historical data',
-        details: errorMessage
-      });
+      // Check if it's a rate limit error
+      if (error.response?.status === 429 || errorMessage?.includes('Limit Reach')) {
+        res.status(429).json({
+          error: 'API rate limit reached',
+          message: 'We have reached the maximum number of requests to our data provider. Please try again later.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Failed to fetch historical data',
+          details: errorMessage
+        });
+      }
     }
   });
 
@@ -194,10 +218,18 @@ export function setupStockAPI(app: Express) {
       const errorMessage = error.response?.data?.error || error.message;
       await logApiRequest(userId, `/api/stocks/search?query=${query}`, false, responseTime, errorMessage);
       
-      res.status(500).json({
-        error: 'Failed to search stocks',
-        details: errorMessage
-      });
+      // Check if it's a rate limit error
+      if (error.response?.status === 429 || errorMessage?.includes('Limit Reach')) {
+        res.status(429).json({
+          error: 'API rate limit reached',
+          message: 'We have reached the maximum number of requests to our data provider. Please try again later.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Failed to search stocks',
+          details: errorMessage
+        });
+      }
     }
   });
 
@@ -219,10 +251,18 @@ export function setupStockAPI(app: Express) {
       const errorMessage = error.response?.data?.error || error.message;
       await logApiRequest(userId, '/api/stocks/market-summary', false, responseTime, errorMessage);
       
-      res.status(500).json({
-        error: 'Failed to fetch market summary',
-        details: errorMessage
-      });
+      // Check if it's a rate limit error
+      if (error.response?.status === 429 || errorMessage?.includes('Limit Reach')) {
+        res.status(429).json({
+          error: 'API rate limit reached',
+          message: 'We have reached the maximum number of requests to our data provider. Please try again later.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Failed to fetch market summary',
+          details: errorMessage
+        });
+      }
     }
   });
 
@@ -249,10 +289,18 @@ export function setupStockAPI(app: Express) {
       const errorMessage = error.response?.data?.error || error.message;
       await logApiRequest(userId, `/api/news${symbol ? `?symbol=${symbol}` : ''}`, false, responseTime, errorMessage);
       
-      res.status(500).json({
-        error: 'Failed to fetch news',
-        details: errorMessage
-      });
+      // Check if it's a rate limit error
+      if (error.response?.status === 429 || errorMessage?.includes('Limit Reach')) {
+        res.status(429).json({
+          error: 'API rate limit reached',
+          message: 'We have reached the maximum number of requests to our data provider. Please try again later.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Failed to fetch news',
+          details: errorMessage
+        });
+      }
     }
   });
 
@@ -280,10 +328,20 @@ export function setupStockAPI(app: Express) {
         res.json([]);
       }
     } catch (error) {
-      res.status(500).json({
-        error: 'Failed to fetch featured stocks',
-        details: error.message
-      });
+      const errorMessage = error.response?.data?.error || error.message;
+      
+      // Check if it's a rate limit error
+      if (error.response?.status === 429 || errorMessage?.includes('Limit Reach')) {
+        res.status(429).json({
+          error: 'API rate limit reached',
+          message: 'We have reached the maximum number of requests to our data provider. Please try again later.'
+        });
+      } else {
+        res.status(500).json({
+          error: 'Failed to fetch featured stocks',
+          details: errorMessage
+        });
+      }
     }
   });
 }

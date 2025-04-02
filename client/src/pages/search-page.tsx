@@ -30,7 +30,10 @@ export default function SearchPage() {
   const { toast } = useToast();
   
   // Search stocks
-  const { data: searchResults, isLoading: isSearching } = useStockSearch(searchQuery);
+  const { data: searchResults, isLoading: isSearching, error: searchError } = useStockSearch(searchQuery);
+  
+  // Check if the error is a rate limit error
+  const isRateLimitError = searchError?.message?.includes('Rate limit reached');
   
   // Get quote for selected stock
   const { data: stockData, isLoading: isLoadingStock } = useStockQuote(selectedSymbol || "");
@@ -124,6 +127,19 @@ export default function SearchPage() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
                   <span>Searching...</span>
+                </div>
+              ) : isRateLimitError ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="text-destructive text-4xl mb-4">⚠️</div>
+                  <h3 className="text-xl font-semibold mb-2">API Rate Limit Reached</h3>
+                  <p className="text-muted-foreground text-center">
+                    We've reached the limit of requests to our financial data provider. 
+                    Please try again in a few minutes.
+                  </p>
+                  <div className="mt-4 p-4 bg-muted/50 rounded-md max-w-xl text-sm text-muted-foreground">
+                    <p className="font-medium mb-1">Why is this happening?</p>
+                    <p>Our free-tier API key has a limited number of requests per day. If you're seeing this message frequently, it means we've reached that limit.</p>
+                  </div>
                 </div>
               ) : searchQuery.length < 2 ? (
                 <div className="text-center py-8 text-muted-foreground">

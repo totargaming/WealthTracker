@@ -68,20 +68,28 @@ export default function UserWatchlist({
   // Add stock to watchlist mutation
   const addStockMutation = useMutation({
     mutationFn: async (data: AddStockFormValues) => {
-      // First verify the stock exists by fetching its quote
-      const checkRes = await apiRequest("GET", `/api/stocks/quote/${data.symbol}`);
-      const checkData = await checkRes.json();
-      
-      // If the API returned an empty object, the symbol is invalid
-      if (!checkData || Object.keys(checkData).length === 0) {
-        throw new Error(`Invalid stock symbol: ${data.symbol}`);
+      try {
+        // First verify the stock exists by fetching its quote
+        const checkRes = await apiRequest("GET", `/api/stocks/quote/${data.symbol}`);
+        const checkData = await checkRes.json();
+        
+        // If the API returned an empty object, the symbol is invalid
+        if (!checkData || Object.keys(checkData).length === 0) {
+          throw new Error(`Invalid stock symbol: ${data.symbol}`);
+        }
+        
+        // If valid, add to watchlist
+        const res = await apiRequest("POST", `/api/watchlist/items`, {
+          symbol: data.symbol,
+        });
+        return await res.json();
+      } catch (error: any) {
+        // Check if it's a rate limit error
+        if (error.message && error.message.includes('Rate limit reached')) {
+          throw new Error(`API rate limit reached. Please try again in a few minutes.`);
+        }
+        throw error; // Re-throw the original error if it's not a rate limit error
       }
-      
-      // If valid, add to watchlist
-      const res = await apiRequest("POST", `/api/watchlist/items`, {
-        symbol: data.symbol,
-      });
-      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
@@ -95,6 +103,8 @@ export default function UserWatchlist({
     },
     onError: (error: Error) => {
       if (error.message.includes("Invalid stock symbol")) {
+        setInvalidSymbolError(error.message);
+      } else if (error.message.includes("API rate limit reached")) {
         setInvalidSymbolError(error.message);
       } else {
         toast({

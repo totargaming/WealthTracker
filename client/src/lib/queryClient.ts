@@ -2,8 +2,21 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    try {
+      const errorData = await res.json();
+      // Check for our custom API rate limit error
+      if (res.status === 429 && errorData.error === 'API rate limit reached') {
+        throw new Error(`Rate limit reached: ${errorData.message || 'Please try again later'}`);
+      }
+      throw new Error(errorData.error || errorData.message || `Error ${res.status}`);
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        // If the response is not valid JSON, use the text
+        const text = await res.text() || res.statusText;
+        throw new Error(`${res.status}: ${text}`);
+      }
+      throw e;
+    }
   }
 }
 

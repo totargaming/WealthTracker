@@ -20,11 +20,17 @@ interface StockDetailsProps {
 export default function StockDetails({ symbol, onSymbolChange }: StockDetailsProps) {
   const [activeTab, setActiveTab] = useState("chart");
   
-  const { data: stockData, isLoading: isLoadingStock } = useStockQuote(symbol);
-  const { data: stockProfile, isLoading: isLoadingProfile } = useStockProfile(symbol);
-  const { data: historicalData, isLoading: isLoadingHistorical } = useStockHistorical(symbol);
+  const { data: stockData, isLoading: isLoadingStock, error: stockError } = useStockQuote(symbol);
+  const { data: stockProfile, isLoading: isLoadingProfile, error: profileError } = useStockProfile(symbol);
+  const { data: historicalData, isLoading: isLoadingHistorical, error: historicalError } = useStockHistorical(symbol);
   
   const isLoading = isLoadingStock || isLoadingProfile || isLoadingHistorical;
+  
+  // Check if any of the errors are rate limit errors
+  const isRateLimitError = 
+    (stockError?.message?.includes('Rate limit reached') || 
+     profileError?.message?.includes('Rate limit reached') || 
+     historicalError?.message?.includes('Rate limit reached'));
   
   if (isLoading) {
     return (
@@ -52,6 +58,25 @@ export default function StockDetails({ symbol, onSymbolChange }: StockDetailsPro
     );
   }
   
+  // Rate limit error display
+  if (isRateLimitError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="text-destructive text-4xl mb-4">⚠️</div>
+        <h3 className="text-xl font-semibold mb-2">API Rate Limit Reached</h3>
+        <p className="text-muted-foreground text-center">
+          We've reached the limit of requests to our financial data provider. 
+          Please try again in a few minutes.
+        </p>
+        <div className="mt-4 p-4 bg-muted/50 rounded-md max-w-xl text-sm text-muted-foreground">
+          <p className="font-medium mb-1">Why is this happening?</p>
+          <p>Our free-tier API key has a limited number of requests per day. If you're seeing this message frequently, it means we've reached that limit.</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Regular error display for missing data
   if (!stockData) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
