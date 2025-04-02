@@ -18,7 +18,7 @@ export default function StockChart({ symbol, data }: StockChartProps) {
   const { data: historicalData, isLoading } = useStockHistorical(data ? '' : symbol);
   
   // Use passed data or fetched data
-  const chartData = data || historicalData?.historical;
+  const chartData = data || (historicalData?.historical ? historicalData.historical : []);
   
   useEffect(() => {
     if (!chartData || !chartRef.current) return;
@@ -71,65 +71,82 @@ export default function StockChart({ symbol, data }: StockChartProps) {
   };
   
   const drawSimpleChart = (data: any[], container: HTMLElement) => {
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div class="flex items-center justify-center h-full text-muted-foreground">No data available</div>';
-      return;
-    }
-    
-    // Clear container
-    container.innerHTML = '';
-    
-    // Find min and max values for scaling
-    const prices = data.map(item => item.close);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    const range = maxPrice - minPrice;
-    
-    // Create SVG
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("viewBox", `0 0 ${data.length} 100`);
-    svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "100%");
-    svg.setAttribute("preserveAspectRatio", "none");
-    svg.setAttribute("class", "overflow-visible");
-    
-    // Create path
-    const path = document.createElementNS(svgNS, "path");
-    
-    let pathData = "";
-    data.forEach((item, index) => {
-      const x = index;
-      const normalizedPrice = 100 - ((item.close - minPrice) / range) * 90;
-      
-      if (index === 0) {
-        pathData += `M ${x},${normalizedPrice} `;
-      } else {
-        pathData += `L ${x},${normalizedPrice} `;
+    try {
+      if (!data || data.length === 0) {
+        container.innerHTML = '<div class="flex items-center justify-center h-full text-muted-foreground">No data available</div>';
+        return;
       }
-    });
-    
-    path.setAttribute("d", pathData);
-    path.setAttribute("fill", "none");
-    path.setAttribute("stroke", data[0].close < data[data.length - 1].close ? "#10b981" : "#ef4444");
-    path.setAttribute("stroke-width", "1.5");
-    
-    // Append path to SVG
-    svg.appendChild(path);
-    
-    // Append SVG to container
-    container.appendChild(svg);
-    
-    // Add price labels
-    const priceInfo = document.createElement("div");
-    priceInfo.className = "flex justify-between mt-2 text-sm text-muted-foreground";
-    priceInfo.innerHTML = `
-      <div>Open: $${data[0].close.toFixed(2)}</div>
-      <div>Close: $${data[data.length - 1].close.toFixed(2)}</div>
-      <div>High: $${maxPrice.toFixed(2)}</div>
-      <div>Low: $${minPrice.toFixed(2)}</div>
-    `;
-    container.appendChild(priceInfo);
+      
+      // Clear container
+      container.innerHTML = '';
+      
+      // Find min and max values for scaling
+      const prices = data.map(item => Number(item.close) || 0);
+      if (prices.length === 0 || prices.every(p => p === 0)) {
+        container.innerHTML = '<div class="flex items-center justify-center h-full text-muted-foreground">Invalid price data</div>';
+        return;
+      }
+      
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      const range = maxPrice - minPrice || 1; // Prevent division by zero
+      
+      // Create SVG
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("viewBox", `0 0 ${data.length} 100`);
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", "100%");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("class", "overflow-visible");
+      
+      // Create path
+      const path = document.createElementNS(svgNS, "path");
+      
+      let pathData = "";
+      data.forEach((item, index) => {
+        const x = index;
+        const close = Number(item.close) || 0;
+        const normalizedPrice = 100 - ((close - minPrice) / range) * 90;
+        
+        if (index === 0) {
+          pathData += `M ${x},${normalizedPrice} `;
+        } else {
+          pathData += `L ${x},${normalizedPrice} `;
+        }
+      });
+      
+      path.setAttribute("d", pathData);
+      path.setAttribute("fill", "none");
+      
+      // Determine if stock is up or down
+      const firstPrice = Number(data[0]?.close) || 0;
+      const lastPrice = Number(data[data.length - 1]?.close) || 0;
+      const isUp = lastPrice > firstPrice;
+      
+      path.setAttribute("stroke", isUp ? "#10b981" : "#ef4444");
+      path.setAttribute("stroke-width", "1.5");
+      
+      // Append path to SVG
+      svg.appendChild(path);
+      
+      // Append SVG to container
+      container.appendChild(svg);
+      
+      // Add price labels
+      const priceInfo = document.createElement("div");
+      priceInfo.className = "flex justify-between mt-2 text-sm text-muted-foreground";
+      priceInfo.innerHTML = `
+        <div>Open: $${firstPrice.toFixed(2)}</div>
+        <div>Close: $${lastPrice.toFixed(2)}</div>
+        <div>High: $${maxPrice.toFixed(2)}</div>
+        <div>Low: $${minPrice.toFixed(2)}</div>
+      `;
+      container.appendChild(priceInfo);
+    } catch (error) {
+      console.error("Error drawing chart:", error);
+      container.innerHTML = '<div class="flex items-center justify-center h-full text-muted-foreground">Error drawing chart</div>';
+    }
   };
   
   if (isLoading) {

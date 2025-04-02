@@ -30,7 +30,7 @@ export default function StockDetailPage() {
   }
 
   return (
-    <div className="container flex min-h-screen bg-[#F4F5F7]">
+    <div className="container flex min-h-screen bg-background dark:bg-background">
       <Sidebar isOpen={sidebarOpen} userName={user?.fullName || ""} userRole={user?.role || ""} />
       
       <button 
@@ -49,7 +49,7 @@ export default function StockDetailPage() {
               <i className="fas fa-arrow-left mr-2"></i>
               Back
             </Button>
-            <h2 className="text-2xl font-semibold text-[#172B4D] font-['Inter']">Stock Details</h2>
+            <h2 className="text-2xl font-semibold text-foreground font-['Inter']">Stock Details</h2>
           </div>
           
           {isLoading ? (
@@ -237,7 +237,118 @@ export default function StockDetailPage() {
                     </div>
                     
                     <div className="mt-6">
-                      <Button className="w-full bg-[#0052CC] hover:bg-[#0747A6]">
+                      <Button 
+                        className="w-full bg-[#0052CC] hover:bg-[#0747A6]"
+                        onClick={() => {
+                          if (!user) return;
+                          
+                          const dialog = document.createElement('dialog');
+                          dialog.className = 'bg-background p-6 rounded-md shadow-lg max-w-md w-full border border-border';
+                          dialog.innerHTML = `
+                            <h3 class="text-xl font-semibold mb-4">Add ${symbol} to Watchlist</h3>
+                            <div id="watchlists-list" class="space-y-2 mb-4">
+                              <div class="text-center py-4">
+                                <div class="animate-spin h-6 w-6 border-t-2 border-primary rounded-full mx-auto"></div>
+                                <p class="mt-2 text-sm text-muted-foreground">Loading watchlists...</p>
+                              </div>
+                            </div>
+                            <div class="flex justify-end gap-2 mt-4">
+                              <button id="cancel-btn" class="px-4 py-2 border border-border rounded-md hover:bg-accent">Cancel</button>
+                            </div>
+                          `;
+                          document.body.appendChild(dialog);
+                          dialog.showModal();
+                          
+                          const cancelBtn = dialog.querySelector('#cancel-btn');
+                          if (cancelBtn) {
+                            cancelBtn.addEventListener('click', () => {
+                              dialog.close();
+                              dialog.remove();
+                            });
+                          }
+                          
+                          // Load watchlists
+                          fetch('/api/watchlists')
+                            .then(res => res.json())
+                            .then(watchlists => {
+                              const watchlistsContainer = dialog.querySelector('#watchlists-list');
+                              if (!watchlistsContainer) return;
+                              
+                              watchlistsContainer.innerHTML = '';
+                              
+                              if (!Array.isArray(watchlists) || watchlists.length === 0) {
+                                watchlistsContainer.innerHTML = `
+                                  <div class="text-center py-4">
+                                    <p class="text-muted-foreground">You don't have any watchlists yet.</p>
+                                    <a href="/watchlists" class="text-primary hover:underline mt-2 inline-block">Create a watchlist</a>
+                                  </div>
+                                `;
+                                return;
+                              }
+                              
+                              watchlists.forEach((watchlist: {id: number, name: string}) => {
+                                const watchlistItem = document.createElement('div');
+                                watchlistItem.className = 'flex justify-between items-center p-3 border rounded-md hover:bg-accent cursor-pointer';
+                                watchlistItem.innerHTML = `
+                                  <span>${watchlist.name}</span>
+                                  <button class="px-2 py-1 bg-primary text-white rounded-md text-sm">Add</button>
+                                `;
+                                
+                                const addBtn = watchlistItem.querySelector('button');
+                                if (addBtn) {
+                                  addBtn.addEventListener('click', async (e) => {
+                                    e.stopPropagation();
+                                    
+                                    try {
+                                      const res = await fetch(`/api/watchlists/${watchlist.id}/items`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({ symbol }),
+                                      });
+                                      
+                                      if (res.ok) {
+                                        if (addBtn) {
+                                          addBtn.textContent = 'Added!';
+                                          addBtn.classList.remove('bg-primary');
+                                          addBtn.classList.add('bg-green-500');
+                                        }
+                                        
+                                        setTimeout(() => {
+                                          dialog.close();
+                                          dialog.remove();
+                                        }, 1000);
+                                      } else {
+                                        throw new Error(`Failed to add ${symbol} to watchlist: ${res.status}`);
+                                      }
+                                    } catch (err) {
+                                      console.error('Failed to add to watchlist:', err);
+                                      if (addBtn) {
+                                        addBtn.textContent = 'Error!';
+                                        addBtn.classList.remove('bg-primary');
+                                        addBtn.classList.add('bg-red-500');
+                                      }
+                                    }
+                                  });
+                                }
+                                
+                                watchlistsContainer.appendChild(watchlistItem);
+                              });
+                            })
+                            .catch(err => {
+                              console.error('Failed to load watchlists:', err);
+                              const watchlistsContainer = dialog.querySelector('#watchlists-list');
+                              if (watchlistsContainer) {
+                                watchlistsContainer.innerHTML = `
+                                  <div class="text-center py-4">
+                                    <p class="text-red-500">Failed to load watchlists. Please try again later.</p>
+                                  </div>
+                                `;
+                              }
+                            });
+                        }}
+                      >
                         <i className="fas fa-star mr-2"></i>
                         Add to Watchlist
                       </Button>

@@ -108,8 +108,8 @@ export default function StockDetails({ symbol, onSymbolChange }: StockDetailsPro
         </TabsList>
         
         <TabsContent value="chart" className="pt-4">
-          {historicalData ? (
-            <StockChart symbol={symbol} data={historicalData} />
+          {historicalData && historicalData.historical ? (
+            <StockChart symbol={symbol} data={historicalData.historical} />
           ) : (
             <div className="h-[300px] flex items-center justify-center border border-border rounded-md">
               <div className="text-center text-muted-foreground">
