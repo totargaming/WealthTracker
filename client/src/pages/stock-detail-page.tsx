@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useStockQuote, useCompanyProfile } from "@/hooks/use-stocks";
+import { useStockQuote, useStockProfile } from "@/hooks/use-stocks";
 
 export default function StockDetailPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -17,7 +17,7 @@ export default function StockDetailPage() {
   const { symbol } = useParams();
   
   const { data: stockData, isLoading: isLoadingStock } = useStockQuote(symbol || "");
-  const { data: companyProfile, isLoading: isLoadingProfile } = useCompanyProfile(symbol || "");
+  const { data: companyProfile, isLoading: isLoadingProfile } = useStockProfile(symbol || "");
   
   const isLoading = isLoadingStock || isLoadingProfile;
   

@@ -1,175 +1,205 @@
-import { useEffect, useRef, useState } from "react";
-import { useStockHistory } from "@/hooks/use-stocks";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useStockHistorical } from "@/hooks/use-stocks";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
-import { Chart, registerables } from 'chart.js';
-
-// Register Chart.js components
-Chart.register(...registerables);
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StockChartProps {
   symbol: string;
+  data?: any;
 }
 
-export default function StockChart({ symbol }: StockChartProps) {
-  const [timeframe, setTimeframe] = useState("1y");
-  const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInstance = useRef<Chart | null>(null);
+export default function StockChart({ symbol, data }: StockChartProps) {
+  const [timeRange, setTimeRange] = useState<'1d' | '1w' | '1m' | '3m' | '1y' | 'all'>('1m');
+  const chartRef = useRef<HTMLDivElement>(null);
   
-  const { data, isLoading, error } = useStockHistory(symbol, timeframe);
+  // Only fetch if data wasn't passed in
+  const { data: historicalData, isLoading } = useStockHistorical(data ? '' : symbol);
   
-  // Cleanup chart instance on unmount
+  // Use passed data or fetched data
+  const chartData = data || historicalData?.historical;
+  
   useEffect(() => {
+    if (!chartData || !chartRef.current) return;
+    
+    // Filter data based on time range
+    const filteredData = filterDataByTimeRange(chartData, timeRange);
+    
+    // Here you would normally use a charting library like Chart.js or Recharts
+    // This is a placeholder that renders a very simple chart
+    drawSimpleChart(filteredData, chartRef.current);
+    
     return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-        chartInstance.current = null;
+      if (chartRef.current) {
+        chartRef.current.innerHTML = '';
       }
     };
-  }, []);
+  }, [chartData, timeRange]);
   
-  // Create or update chart when data changes
-  useEffect(() => {
-    if (!chartRef.current || !data || !data.historical || data.historical.length === 0) return;
+  const filterDataByTimeRange = (data: any[], range: string) => {
+    if (!data || !data.length) return [];
     
-    if (chartInstance.current) {
-      chartInstance.current.destroy();
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (range) {
+      case '1d':
+        startDate.setDate(now.getDate() - 1);
+        break;
+      case '1w':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case '1m':
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case '3m':
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case '1y':
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      case 'all':
+      default:
+        return data;
     }
     
-    const ctx = chartRef.current.getContext('2d');
-    if (!ctx) return;
+    return data.filter((item: any) => {
+      const itemDate = new Date(item.date);
+      return itemDate >= startDate;
+    });
+  };
+  
+  const drawSimpleChart = (data: any[], container: HTMLElement) => {
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="flex items-center justify-center h-full text-muted-foreground">No data available</div>';
+      return;
+    }
     
-    const sortedData = [...data.historical].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Clear container
+    container.innerHTML = '';
     
-    const timestamps = sortedData.map(item => item.date);
-    const prices = sortedData.map(item => item.close);
+    // Find min and max values for scaling
+    const prices = data.map(item => item.close);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const range = maxPrice - minPrice;
     
-    const gradientFill = ctx.createLinearGradient(0, 0, 0, 250);
-    gradientFill.addColorStop(0, 'rgba(76, 154, 255, 0.3)');
-    gradientFill.addColorStop(1, 'rgba(76, 154, 255, 0.0)');
+    // Create SVG
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${data.length} 100`);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("class", "overflow-visible");
     
-    chartInstance.current = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: timestamps,
-        datasets: [{
-          label: symbol,
-          data: prices,
-          borderColor: '#0052CC',
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 6,
-          pointHoverBackgroundColor: '#0052CC',
-          pointHoverBorderColor: '#fff',
-          pointHoverBorderWidth: 2,
-          tension: 0.1,
-          fill: true,
-          backgroundColor: gradientFill
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          intersect: false,
-          mode: 'index',
-        },
-        scales: {
-          x: {
-            grid: {
-              display: false
-            },
-            ticks: {
-              maxTicksLimit: 8,
-              font: {
-                family: "'Roboto', sans-serif",
-                size: 10
-              }
-            }
-          },
-          y: {
-            position: 'right',
-            grid: {
-              color: 'rgba(223, 225, 230, 0.5)'
-            },
-            ticks: {
-              font: {
-                family: "'Roboto Mono', monospace",
-                size: 10
-              }
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            titleColor: '#172B4D',
-            bodyColor: '#172B4D',
-            borderColor: '#DFE1E6',
-            borderWidth: 1,
-            padding: 10,
-            displayColors: false,
-            bodyFont: {
-              family: "'Roboto Mono', monospace"
-            },
-            callbacks: {
-              label: function(context) {
-                return `$${parseFloat(context.raw as string).toFixed(2)}`;
-              }
-            }
-          }
-        }
+    // Create path
+    const path = document.createElementNS(svgNS, "path");
+    
+    let pathData = "";
+    data.forEach((item, index) => {
+      const x = index;
+      const normalizedPrice = 100 - ((item.close - minPrice) / range) * 90;
+      
+      if (index === 0) {
+        pathData += `M ${x},${normalizedPrice} `;
+      } else {
+        pathData += `L ${x},${normalizedPrice} `;
       }
     });
-  }, [data, symbol]);
-  
-  // Handle timeframe change
-  const handleTimeframeChange = (value: string) => {
-    setTimeframe(value);
+    
+    path.setAttribute("d", pathData);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", data[0].close < data[data.length - 1].close ? "#10b981" : "#ef4444");
+    path.setAttribute("stroke-width", "1.5");
+    
+    // Append path to SVG
+    svg.appendChild(path);
+    
+    // Append SVG to container
+    container.appendChild(svg);
+    
+    // Add price labels
+    const priceInfo = document.createElement("div");
+    priceInfo.className = "flex justify-between mt-2 text-sm text-muted-foreground";
+    priceInfo.innerHTML = `
+      <div>Open: $${data[0].close.toFixed(2)}</div>
+      <div>Close: $${data[data.length - 1].close.toFixed(2)}</div>
+      <div>High: $${maxPrice.toFixed(2)}</div>
+      <div>Low: $${minPrice.toFixed(2)}</div>
+    `;
+    container.appendChild(priceInfo);
   };
   
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[300px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <Skeleton className="w-full h-[300px]" />;
   }
   
-  if (error) {
+  if (!chartData) {
     return (
-      <div className="flex items-center justify-center h-[300px] bg-neutral-100 rounded-md">
-        <div className="text-center text-neutral-600">
-          <p className="mb-2">Failed to load chart data</p>
-          <p className="text-sm">{(error as Error).message}</p>
+      <div className="h-[300px] flex items-center justify-center border border-border rounded-md">
+        <div className="text-center text-muted-foreground">
+          <div className="text-xl mb-2">No chart data available</div>
+          <p>Historical data could not be loaded for {symbol}</p>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <Tabs value={timeframe} onValueChange={handleTimeframeChange} className="w-full">
-          <TabsList>
-            <TabsTrigger value="1d">1D</TabsTrigger>
-            <TabsTrigger value="1w">1W</TabsTrigger>
-            <TabsTrigger value="1m">1M</TabsTrigger>
-            <TabsTrigger value="3m">3M</TabsTrigger>
-            <TabsTrigger value="6m">6M</TabsTrigger>
-            <TabsTrigger value="1y">1Y</TabsTrigger>
-            <TabsTrigger value="5y">5Y</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-      
-      <div className="h-[300px] relative">
-        <canvas ref={chartRef} height="300"></canvas>
-      </div>
-    </div>
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex justify-between items-center mb-4">
+          <div className="font-medium">{symbol} Stock Chart</div>
+          <div className="flex gap-1">
+            <Button 
+              variant={timeRange === '1d' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setTimeRange('1d')}
+            >
+              1D
+            </Button>
+            <Button 
+              variant={timeRange === '1w' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setTimeRange('1w')}
+            >
+              1W
+            </Button>
+            <Button 
+              variant={timeRange === '1m' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setTimeRange('1m')}
+            >
+              1M
+            </Button>
+            <Button 
+              variant={timeRange === '3m' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setTimeRange('3m')}
+            >
+              3M
+            </Button>
+            <Button 
+              variant={timeRange === '1y' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setTimeRange('1y')}
+            >
+              1Y
+            </Button>
+            <Button 
+              variant={timeRange === 'all' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setTimeRange('all')}
+            >
+              All
+            </Button>
+          </div>
+        </div>
+        
+        <div className="h-[300px]" ref={chartRef}></div>
+      </CardContent>
+    </Card>
   );
 }

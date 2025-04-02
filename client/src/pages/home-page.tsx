@@ -1,13 +1,16 @@
 import { useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
-import StockList from "@/components/stocks/stock-list";
 import StockDetails from "@/components/stocks/stock-details";
-import NewsList from "@/components/news/news-list";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useStockQuote } from "@/hooks/use-stocks";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
+import { PieChart, LineChart, Search, Plus, ArrowRight, RefreshCw } from "lucide-react";
+import WatchlistManagement from "@/components/stocks/watchlist-management";
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -15,7 +18,7 @@ export default function HomePage() {
   const { user } = useAuth();
   
   // Fetch watchlists
-  const { data: watchlists } = useQuery({
+  const { data: watchlists = [] } = useQuery({
     queryKey: ["/api/watchlists"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/watchlists");
@@ -26,10 +29,14 @@ export default function HomePage() {
   // Create default watchlist if user doesn't have any
   const defaultWatchlist = watchlists?.[0];
   
-  const { data: stockData } = useStockQuote(selectedStock);
+  const { data: stockData, refetch } = useStockQuote(selectedStock);
   
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleSelectStock = (symbol: string) => {
+    setSelectedStock(symbol);
   };
 
   return (
@@ -47,67 +54,142 @@ export default function HomePage() {
         <TopBar onMenuClick={toggleSidebar} />
         
         <div className="p-6">
-          <div className="mb-6 flex justify-between items-center">
+          <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <h2 className="text-2xl font-semibold text-foreground font-['Inter']">Dashboard</h2>
-            <button className="flex items-center gap-2 rounded border border-primary bg-card px-3 py-2 text-sm font-medium text-primary">
-              <i className="fas fa-sync-alt"></i>
-              <span>Refresh</span>
-            </button>
+            
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/search">
+                  <Search className="h-4 w-4 mr-2" />
+                  Search Stocks
+                </Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/portfolio">
+                  <PieChart className="h-4 w-4 mr-2" />
+                  Portfolio
+                </Link>
+              </Button>
+            </div>
           </div>
           
-          <div className="grid grid-cols-1 gap-6">
-            <div className="card">
-              <div className="card-header flex items-center justify-between">
-                <h3 className="card-title text-foreground">Your Watchlist</h3>
-                <div className="flex gap-2">
-                  <button className="flex h-8 w-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-muted">
-                    <i className="fas fa-plus"></i>
-                  </button>
-                  <button className="flex h-8 w-8 items-center justify-center rounded border border-border text-muted-foreground hover:bg-muted">
-                    <i className="fas fa-cog"></i>
-                  </button>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
+            <Card className="md:col-span-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Market Value</CardTitle>
+                <CardDescription>Current stock value</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-3xl font-bold font-mono">
+                  ${stockData?.price?.toFixed(2) || "0.00"}
                 </div>
-              </div>
-              
-              <div className="card-content">
-                <StockList 
-                  watchlistId={defaultWatchlist?.id} 
-                  onSelectStock={(symbol) => setSelectedStock(symbol)} 
-                  selectedStock={selectedStock}
-                />
-              </div>
+                <div className={`text-sm font-medium mt-1 ${
+                  (stockData?.change || 0) >= 0 ? 'text-green-500' : 'text-red-500'
+                }`}>
+                  {(stockData?.change || 0) >= 0 ? '▲' : '▼'} {stockData?.change?.toFixed(2) || "0.00"}%
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="md:col-span-8">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Quick Actions</CardTitle>
+                <CardDescription>Commonly used features</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Button variant="outline" className="h-auto py-6 flex flex-col" asChild>
+                    <Link href="/portfolio">
+                      <div className="space-y-2">
+                        <LineChart className="h-5 w-5 mx-auto" />
+                        <div className="text-sm font-medium">Create Portfolio</div>
+                      </div>
+                    </Link>
+                  </Button>
+                  
+                  <Button variant="outline" className="h-auto py-6 flex flex-col" asChild>
+                    <Link href="/watchlist">
+                      <div className="space-y-2">
+                        <Plus className="h-5 w-5 mx-auto" />
+                        <div className="text-sm font-medium">New Watchlist</div>
+                      </div>
+                    </Link>
+                  </Button>
+                  
+                  <Button variant="outline" className="h-auto py-6 flex flex-col" asChild>
+                    <Link href="/search">
+                      <div className="space-y-2">
+                        <Search className="h-5 w-5 mx-auto" />
+                        <div className="text-sm font-medium">Find Stocks</div>
+                      </div>
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-lg">Stock Analysis</CardTitle>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/stock/${selectedStock}`}>
+                        <div className="flex items-center">
+                          <span className="text-xs mr-1">Full Report</span>
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {selectedStock && <StockDetails symbol={selectedStock} onSymbolChange={setSelectedStock} />}
+                </CardContent>
+              </Card>
             </div>
             
-            <div className="card">
-              <div className="card-header flex items-center justify-between">
-                <h3 className="card-title text-foreground">Stock Analysis</h3>
-                <button className="flex items-center gap-2 rounded border border-border bg-card px-3 py-1 text-sm font-medium text-muted-foreground hover:bg-muted">
-                  <i className="fas fa-external-link-alt"></i>
-                  <span>Full Report</span>
-                </button>
-              </div>
-              
-              <div className="card-content">
-                {selectedStock && <StockDetails symbol={selectedStock} />}
-              </div>
-            </div>
-            
-            <div className="card">
-              <div className="card-header flex items-center justify-between">
-                <h3 className="card-title text-foreground">Latest Financial News</h3>
-                <button className="flex items-center gap-2 rounded border border-border bg-card px-3 py-1 text-sm font-medium text-muted-foreground hover:bg-muted">
-                  <i className="fas fa-filter"></i>
-                  <span>Filter</span>
-                </button>
-              </div>
-              
-              <div className="card-content">
-                <NewsList symbol={selectedStock} limit={4} />
-              </div>
-              
-              <div className="border-t border-border p-3 text-center">
-                <a href="#" className="text-sm text-primary hover:underline">View all news</a>
-              </div>
+            <div className="flex flex-col gap-6">
+              <Card>
+                <CardHeader className="pb-0">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-lg">Watchlist</CardTitle>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href="/watchlist">
+                        <div className="flex items-center">
+                          <span className="text-xs mr-1">View All</span>
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {defaultWatchlist ? (
+                    <WatchlistManagement 
+                      watchlistId={defaultWatchlist.id}
+                      onSelectStock={handleSelectStock}
+                      selectedStock={selectedStock}
+                    />
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-muted-foreground mb-3">You don't have any watchlists yet</p>
+                      <Button asChild>
+                        <Link href="/watchlist">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Watchlist
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>

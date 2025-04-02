@@ -1,217 +1,272 @@
-import { Express, Request } from "express";
-import axios from "axios";
-import { storage } from "./storage";
+import axios from 'axios';
+import { Express, Request, Response } from 'express';
+import { storage } from './storage';
 
-// Get Financial Modeling Prep API key from environment variables
-const FMP_API_KEY = process.env.FMP_API_KEY || "demo";
-const FMP_API_BASE_URL = "https://financialmodelingprep.com/api/v3";
-
-// Helper function to log API requests for monitoring
+// Log API requests to the database
 async function logApiRequest(
-  endpoint: string,
   userId: number | null,
+  endpoint: string,
   success: boolean,
-  responseTime?: number,
+  responseTime: number,
   errorMessage?: string
 ) {
   try {
     await storage.logApiRequest({
-      endpoint,
       userId,
+      endpoint,
       requestTime: new Date(),
       responseTime,
       success,
-      errorMessage
+      errorMessage: errorMessage || null
     });
   } catch (error) {
-    console.error("Failed to log API request:", error);
+    console.error('Failed to log API request:', error);
   }
 }
 
+// Financial Modeling Prep API client
+const FMP_API_KEY = process.env.FMP_API_KEY;
+const FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3';
+
+const fmpClient = axios.create({
+  baseURL: FMP_BASE_URL,
+  params: {
+    apikey: FMP_API_KEY
+  }
+});
+
+// Set up API routes
 export function setupStockAPI(app: Express) {
-  // Market indexes (S&P 500, Dow Jones, Nasdaq, Russell 2000)
-  app.get("/api/market/indexes", async (req, res) => {
-    const endpoint = "/api/market/indexes";
-    const userId = req.isAuthenticated() ? req.user!.id : null;
-    const startTime = Date.now();
-    
+  // Middleware to check for restricted stocks
+  const checkRestricted = async (req: Request, res: Response, next: Function) => {
     try {
-      const response = await axios.get(`${FMP_API_BASE_URL}/quote/%5EGSPC,%5EDJI,%5EIXIC,%5ERUT?apikey=${FMP_API_KEY}`);
-      const responseTime = Date.now() - startTime;
-      
-      // Log successful request
-      logApiRequest(endpoint, userId, true, responseTime);
-      
-      res.json(response.data);
-    } catch (error) {
-      const responseTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      
-      // Log failed request
-      logApiRequest(endpoint, userId, false, responseTime, errorMessage);
-      
-      res.status(500).json({ message: "Failed to fetch market indexes" });
-    }
-  });
+      const symbol = req.params.symbol?.toUpperCase();
+      if (!symbol) return next();
 
-  // Stock search
-  app.get("/api/stocks/search", async (req, res) => {
-    const query = req.query.query;
-    const endpoint = "/api/stocks/search";
-    const userId = req.isAuthenticated() ? req.user!.id : null;
-    const startTime = Date.now();
-    
-    if (!query) {
-      // Log invalid request
-      logApiRequest(endpoint, userId, false, 0, "Missing query parameter");
-      return res.status(400).json({ message: "Query parameter is required" });
-    }
-    
-    try {
-      const response = await axios.get(`${FMP_API_BASE_URL}/search?query=${query}&limit=10&apikey=${FMP_API_KEY}`);
-      const responseTime = Date.now() - startTime;
+      const restrictedStocks = await storage.getRestrictedStocks();
+      const isRestricted = restrictedStocks.some(stock => stock.symbol === symbol);
       
-      // Log successful request
-      logApiRequest(endpoint, userId, true, responseTime);
-      
-      res.json(response.data);
-    } catch (error) {
-      const responseTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      
-      // Log failed request
-      logApiRequest(endpoint, userId, false, responseTime, errorMessage);
-      
-      res.status(500).json({ message: "Failed to search stocks" });
-    }
-  });
-
-  // Stock quote data
-  app.get("/api/stocks/quote/:symbol", async (req, res) => {
-    const { symbol } = req.params;
-    const endpoint = `/api/stocks/quote/${symbol}`;
-    const userId = req.isAuthenticated() ? req.user!.id : null;
-    const startTime = Date.now();
-    
-    try {
-      const response = await axios.get(`${FMP_API_BASE_URL}/quote/${symbol}?apikey=${FMP_API_KEY}`);
-      const responseTime = Date.now() - startTime;
-      
-      // Log successful request
-      logApiRequest(endpoint, userId, true, responseTime);
-      
-      res.json(response.data[0]);
-    } catch (error) {
-      const responseTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      
-      // Log failed request
-      logApiRequest(endpoint, userId, false, responseTime, errorMessage);
-      
-      res.status(500).json({ message: "Failed to fetch stock quote" });
-    }
-  });
-
-  // Stock historical price data
-  app.get("/api/stocks/historical/:symbol", async (req, res) => {
-    try {
-      const { symbol } = req.params;
-      const { timeframe } = req.query;
-      
-      // Default to 1 year
-      let period = "1year";
-      
-      if (timeframe === "1d") period = "1day";
-      else if (timeframe === "1w") period = "1week";
-      else if (timeframe === "1m") period = "1month";
-      else if (timeframe === "3m") period = "3month";
-      else if (timeframe === "6m") period = "6month";
-      else if (timeframe === "5y") period = "5year";
-      
-      const response = await axios.get(`${FMP_API_BASE_URL}/historical-price-full/${symbol}?apikey=${FMP_API_KEY}&timeseries=${period}`);
-      res.json(response.data);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch historical data" });
-    }
-  });
-
-  // Company profile
-  app.get("/api/stocks/profile/:symbol", async (req, res) => {
-    try {
-      const { symbol } = req.params;
-      const response = await axios.get(`${FMP_API_BASE_URL}/profile/${symbol}?apikey=${FMP_API_KEY}`);
-      res.json(response.data[0]);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch company profile" });
-    }
-  });
-
-  // Key metrics
-  app.get("/api/stocks/metrics/:symbol", async (req, res) => {
-    try {
-      const { symbol } = req.params;
-      const response = await axios.get(`${FMP_API_BASE_URL}/key-metrics/${symbol}?limit=1&apikey=${FMP_API_KEY}`);
-      res.json(response.data[0]);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch key metrics" });
-    }
-  });
-
-  // Financial ratios
-  app.get("/api/stocks/ratios/:symbol", async (req, res) => {
-    try {
-      const { symbol } = req.params;
-      const response = await axios.get(`${FMP_API_BASE_URL}/ratios/${symbol}?limit=1&apikey=${FMP_API_KEY}`);
-      res.json(response.data[0]);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch financial ratios" });
-    }
-  });
-
-  // Stock news
-  app.get("/api/news", async (req, res) => {
-    try {
-      const { symbol, limit = 10 } = req.query;
-      
-      let url = `${FMP_API_BASE_URL}/stock_news?limit=${limit}&apikey=${FMP_API_KEY}`;
-      if (symbol) {
-        url = `${FMP_API_BASE_URL}/stock_news?tickers=${symbol}&limit=${limit}&apikey=${FMP_API_KEY}`;
+      if (isRestricted) {
+        return res.status(403).json({
+          error: 'This stock is restricted by the administrator'
+        });
       }
       
-      const response = await axios.get(url);
-      res.json(response.data);
+      next();
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch news" });
+      next(error);
+    }
+  };
+
+  // Get stock quote
+  app.get('/api/stocks/quote/:symbol', checkRestricted, async (req, res) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const userId = req.user ? req.user.id : null;
+    const startTime = Date.now();
+    
+    try {
+      const response = await fmpClient.get(`/quote/${symbol}`);
+      const data = response.data[0] || null;
+      
+      const responseTime = Date.now() - startTime;
+      await logApiRequest(userId, `/api/stocks/quote/${symbol}`, true, responseTime);
+      
+      if (!data) {
+        return res.status(404).json({ error: `No data found for ${symbol}` });
+      }
+      
+      res.json(data);
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error.response?.data?.error || error.message;
+      await logApiRequest(userId, `/api/stocks/quote/${symbol}`, false, responseTime, errorMessage);
+      
+      res.status(500).json({
+        error: 'Failed to fetch stock quote',
+        details: errorMessage
+      });
     }
   });
 
-  // Most active stocks
-  app.get("/api/stocks/most-active", async (req, res) => {
+  // Get company profile
+  app.get('/api/stocks/profile/:symbol', checkRestricted, async (req, res) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const userId = req.user ? req.user.id : null;
+    const startTime = Date.now();
+    
     try {
-      const response = await axios.get(`${FMP_API_BASE_URL}/stock/actives?apikey=${FMP_API_KEY}`);
-      res.json(response.data);
+      const response = await fmpClient.get(`/profile/${symbol}`);
+      const data = response.data[0] || null;
+      
+      const responseTime = Date.now() - startTime;
+      await logApiRequest(userId, `/api/stocks/profile/${symbol}`, true, responseTime);
+      
+      if (!data) {
+        return res.status(404).json({ error: `No profile found for ${symbol}` });
+      }
+      
+      res.json(data);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch most active stocks" });
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error.response?.data?.error || error.message;
+      await logApiRequest(userId, `/api/stocks/profile/${symbol}`, false, responseTime, errorMessage);
+      
+      res.status(500).json({
+        error: 'Failed to fetch company profile',
+        details: errorMessage
+      });
     }
   });
 
-  // Gainers
-  app.get("/api/stocks/gainers", async (req, res) => {
+  // Get historical data
+  app.get('/api/stocks/historical/:symbol', checkRestricted, async (req, res) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const userId = req.user ? req.user.id : null;
+    const startTime = Date.now();
+    
     try {
-      const response = await axios.get(`${FMP_API_BASE_URL}/stock/gainers?apikey=${FMP_API_KEY}`);
+      const response = await fmpClient.get(`/historical-price-full/${symbol}?serietype=line`);
+      
+      const responseTime = Date.now() - startTime;
+      await logApiRequest(userId, `/api/stocks/historical/${symbol}`, true, responseTime);
+      
+      if (!response.data || !response.data.historical) {
+        return res.status(404).json({ error: `No historical data found for ${symbol}` });
+      }
+      
       res.json(response.data);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch gainers" });
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error.response?.data?.error || error.message;
+      await logApiRequest(userId, `/api/stocks/historical/${symbol}`, false, responseTime, errorMessage);
+      
+      res.status(500).json({
+        error: 'Failed to fetch historical data',
+        details: errorMessage
+      });
     }
   });
 
-  // Losers
-  app.get("/api/stocks/losers", async (req, res) => {
+  // Search for stocks
+  app.get('/api/stocks/search', async (req, res) => {
+    const query = req.query.query as string;
+    const userId = req.user ? req.user.id : null;
+    const startTime = Date.now();
+    
+    if (!query || query.length < 2) {
+      return res.json([]);
+    }
+    
     try {
-      const response = await axios.get(`${FMP_API_BASE_URL}/stock/losers?apikey=${FMP_API_KEY}`);
+      const response = await fmpClient.get(`/search?query=${encodeURIComponent(query)}&limit=10`);
+      
+      const responseTime = Date.now() - startTime;
+      await logApiRequest(userId, `/api/stocks/search?query=${query}`, true, responseTime);
+      
+      // Filter out restricted stocks
+      const restrictedStocks = await storage.getRestrictedStocks();
+      const restrictedSymbols = restrictedStocks.map(stock => stock.symbol);
+      
+      const filteredResults = response.data.filter(item => 
+        !restrictedSymbols.includes(item.symbol)
+      );
+      
+      res.json(filteredResults);
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error.response?.data?.error || error.message;
+      await logApiRequest(userId, `/api/stocks/search?query=${query}`, false, responseTime, errorMessage);
+      
+      res.status(500).json({
+        error: 'Failed to search stocks',
+        details: errorMessage
+      });
+    }
+  });
+
+  // Get market summary (major indices)
+  app.get('/api/stocks/market-summary', async (req, res) => {
+    const userId = req.user ? req.user.id : null;
+    const startTime = Date.now();
+    
+    try {
+      const indices = ['^GSPC', '^DJI', '^IXIC', '^RUT', '^VIX'];
+      const response = await fmpClient.get(`/quote/${indices.join(',')}`);
+      
+      const responseTime = Date.now() - startTime;
+      await logApiRequest(userId, '/api/stocks/market-summary', true, responseTime);
+      
       res.json(response.data);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch losers" });
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error.response?.data?.error || error.message;
+      await logApiRequest(userId, '/api/stocks/market-summary', false, responseTime, errorMessage);
+      
+      res.status(500).json({
+        error: 'Failed to fetch market summary',
+        details: errorMessage
+      });
+    }
+  });
+
+  // Get financial news
+  app.get('/api/news', async (req, res) => {
+    const symbol = req.query.symbol as string;
+    const userId = req.user ? req.user.id : null;
+    const startTime = Date.now();
+    
+    try {
+      let endpoint = '/stock_news?limit=20';
+      if (symbol) {
+        endpoint = `/stock_news?tickers=${symbol.toUpperCase()}&limit=10`;
+      }
+      
+      const response = await fmpClient.get(endpoint);
+      
+      const responseTime = Date.now() - startTime;
+      await logApiRequest(userId, `/api/news${symbol ? `?symbol=${symbol}` : ''}`, true, responseTime);
+      
+      res.json(response.data);
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error.response?.data?.error || error.message;
+      await logApiRequest(userId, `/api/news${symbol ? `?symbol=${symbol}` : ''}`, false, responseTime, errorMessage);
+      
+      res.status(500).json({
+        error: 'Failed to fetch news',
+        details: errorMessage
+      });
+    }
+  });
+
+  // Get featured stocks (admin curated)
+  app.get('/api/stocks/featured', async (req, res) => {
+    try {
+      const featuredStocks = await storage.getFeaturedStocks();
+      
+      // Fetch current quotes for all featured stocks
+      if (featuredStocks.length > 0) {
+        const symbols = featuredStocks.map(stock => stock.symbol).join(',');
+        const response = await fmpClient.get(`/quote/${symbols}`);
+        
+        // Merge quote data with featured stock data
+        const stocksWithQuotes = featuredStocks.map(featured => {
+          const quoteData = response.data.find(quote => quote.symbol === featured.symbol);
+          return {
+            ...featured,
+            quote: quoteData
+          };
+        });
+        
+        res.json(stocksWithQuotes);
+      } else {
+        res.json([]);
+      }
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to fetch featured stocks',
+        details: error.message
+      });
     }
   });
 }

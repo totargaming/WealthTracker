@@ -9,6 +9,8 @@ import WatchlistPage from "@/pages/watchlist-page";
 import StockDetailPage from "@/pages/stock-detail-page";
 import AdminPage from "@/pages/admin-page";
 import SettingsPage from "@/pages/settings-page";
+import SearchPage from "@/pages/search-page";
+import PortfolioPage from "@/pages/portfolio-page";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -18,6 +20,8 @@ function Router() {
     <Switch>
       <ProtectedRoute path="/" component={HomePage} />
       <ProtectedRoute path="/watchlist" component={WatchlistPage} />
+      <ProtectedRoute path="/portfolio" component={PortfolioPage} />
+      <ProtectedRoute path="/search" component={SearchPage} />
       <ProtectedRoute path="/stock/:symbol" component={StockDetailPage} />
       <ProtectedRoute path="/settings" component={SettingsPage} />
       <ProtectedRoute path="/admin" component={AdminPage} />
