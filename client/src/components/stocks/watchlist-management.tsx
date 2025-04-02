@@ -227,6 +227,17 @@ export default function WatchlistManagement({
   
   const onAddStockSubmit = (data: AddStockFormValues) => {
     setInvalidSymbolError(null);
+    
+    // Check if stock already exists in watchlist
+    const alreadyExists = currentWatchlist?.items?.some(
+      (item: any) => item.symbol.toUpperCase() === data.symbol.toUpperCase()
+    );
+    
+    if (alreadyExists) {
+      setInvalidSymbolError(`${data.symbol} is already in this watchlist`);
+      return;
+    }
+    
     addStockMutation.mutate(data);
   };
   

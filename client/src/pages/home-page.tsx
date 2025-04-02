@@ -40,8 +40,10 @@ export default function HomePage() {
   };
 
   return (
-    <div className="container flex min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} userName={user?.fullName || ""} userRole={user?.role || ""} />
+    <div className="flex min-h-screen w-full bg-background">
+      <div className="sticky top-0 h-screen">
+        <Sidebar isOpen={sidebarOpen} userName={user?.fullName || ""} userRole={user?.role || ""} />
+      </div>
       
       <button 
         className={`fixed left-5 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-md lg:hidden`}
