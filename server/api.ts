@@ -1,43 +1,113 @@
-import { Express } from "express";
+import { Express, Request } from "express";
 import axios from "axios";
+import { storage } from "./storage";
 
 // Get Financial Modeling Prep API key from environment variables
 const FMP_API_KEY = process.env.FMP_API_KEY || "demo";
 const FMP_API_BASE_URL = "https://financialmodelingprep.com/api/v3";
 
+// Helper function to log API requests for monitoring
+async function logApiRequest(
+  endpoint: string,
+  userId: number | null,
+  success: boolean,
+  responseTime?: number,
+  errorMessage?: string
+) {
+  try {
+    await storage.logApiRequest({
+      endpoint,
+      userId,
+      requestTime: new Date(),
+      responseTime,
+      success,
+      errorMessage
+    });
+  } catch (error) {
+    console.error("Failed to log API request:", error);
+  }
+}
+
 export function setupStockAPI(app: Express) {
   // Market indexes (S&P 500, Dow Jones, Nasdaq, Russell 2000)
   app.get("/api/market/indexes", async (req, res) => {
+    const endpoint = "/api/market/indexes";
+    const userId = req.isAuthenticated() ? req.user!.id : null;
+    const startTime = Date.now();
+    
     try {
       const response = await axios.get(`${FMP_API_BASE_URL}/quote/%5EGSPC,%5EDJI,%5EIXIC,%5ERUT?apikey=${FMP_API_KEY}`);
+      const responseTime = Date.now() - startTime;
+      
+      // Log successful request
+      logApiRequest(endpoint, userId, true, responseTime);
+      
       res.json(response.data);
     } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // Log failed request
+      logApiRequest(endpoint, userId, false, responseTime, errorMessage);
+      
       res.status(500).json({ message: "Failed to fetch market indexes" });
     }
   });
 
   // Stock search
   app.get("/api/stocks/search", async (req, res) => {
+    const query = req.query.query;
+    const endpoint = "/api/stocks/search";
+    const userId = req.isAuthenticated() ? req.user!.id : null;
+    const startTime = Date.now();
+    
+    if (!query) {
+      // Log invalid request
+      logApiRequest(endpoint, userId, false, 0, "Missing query parameter");
+      return res.status(400).json({ message: "Query parameter is required" });
+    }
+    
     try {
-      const query = req.query.query;
-      if (!query) {
-        return res.status(400).json({ message: "Query parameter is required" });
-      }
-      
       const response = await axios.get(`${FMP_API_BASE_URL}/search?query=${query}&limit=10&apikey=${FMP_API_KEY}`);
+      const responseTime = Date.now() - startTime;
+      
+      // Log successful request
+      logApiRequest(endpoint, userId, true, responseTime);
+      
       res.json(response.data);
     } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // Log failed request
+      logApiRequest(endpoint, userId, false, responseTime, errorMessage);
+      
       res.status(500).json({ message: "Failed to search stocks" });
     }
   });
 
   // Stock quote data
   app.get("/api/stocks/quote/:symbol", async (req, res) => {
+    const { symbol } = req.params;
+    const endpoint = `/api/stocks/quote/${symbol}`;
+    const userId = req.isAuthenticated() ? req.user!.id : null;
+    const startTime = Date.now();
+    
     try {
-      const { symbol } = req.params;
       const response = await axios.get(`${FMP_API_BASE_URL}/quote/${symbol}?apikey=${FMP_API_KEY}`);
+      const responseTime = Date.now() - startTime;
+      
+      // Log successful request
+      logApiRequest(endpoint, userId, true, responseTime);
+      
       res.json(response.data[0]);
     } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // Log failed request
+      logApiRequest(endpoint, userId, false, responseTime, errorMessage);
+      
       res.status(500).json({ message: "Failed to fetch stock quote" });
     }
   });

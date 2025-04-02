@@ -1,7 +1,7 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
-import session from "express-session";
+import session, { Store } from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
@@ -31,16 +31,16 @@ async function comparePasswords(supplied: string, stored: string) {
 
 export function setupAuth(app: Express) {
   // Use environment variable for session secret, with fallback
-  const sessionSecret = process.env.SESSION_SECRET || 'fintrack_session_secret';
+  const sessionSecret = process.env.SESSION_SECRET || "fintrack_session_secret";
 
   const sessionSettings: session.SessionOptions = {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
+    store: storage.sessionStore as Store,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    }
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    },
   };
 
   app.set("trust proxy", 1);
@@ -55,7 +55,19 @@ export function setupAuth(app: Express) {
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
         } else {
-          return done(null, user);
+          // Update last login time (and handle older schema without lastLogin)
+          try {
+            const updatedUser = await storage.updateUser(user.id, {
+              lastLogin: new Date(),
+            });
+            return done(null, updatedUser);
+          } catch (err) {
+            console.warn(
+              "Failed to update lastLogin, continuing with original user",
+              err,
+            );
+            return done(null, user);
+          }
         }
       } catch (error) {
         return done(error);
@@ -84,13 +96,15 @@ export function setupAuth(app: Express) {
     try {
       // Validate input
       const validatedData = registerSchema.parse(req.body);
-      
+
       // Check if username already exists
-      const existingUsername = await storage.getUserByUsername(validatedData.username);
+      const existingUsername = await storage.getUserByUsername(
+        validatedData.username,
+      );
       if (existingUsername) {
         return res.status(400).json({ message: "Username already exists" });
       }
-      
+
       // Check if email already exists
       const existingEmail = await storage.getUserByEmail(validatedData.email);
       if (existingEmail) {
@@ -98,26 +112,62 @@ export function setupAuth(app: Express) {
       }
 
       // Create new user with hashed password
-      const user = await storage.createUser({
-        ...validatedData,
-        password: await hashPassword(validatedData.password),
-        role: "user", // Default role for new users
-      });
+      try {
+        const user = await storage.createUser({
+          ...validatedData,
+          password: await hashPassword(validatedData.password),
+          role: "user", // Default role for new users
+          lastLogin: new Date(),
+        });
 
-      // Auto-login after registration
-      req.login(user, (err) => {
-        if (err) return next(err);
-        // Don't send password in response
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
-      });
+        // Auto-login after registration
+        req.login(user, (err) => {
+          if (err) return next(err);
+          // Don't send password in response
+          const { password, ...userWithoutPassword } = user;
+          res.status(201).json(userWithoutPassword);
+        });
+      } catch (error) {
+        console.error("Error creating user:", error);
+        try {
+          // Try without lastLogin if that's causing the issue
+          const user = await storage.createUser({
+            ...validatedData,
+            password: await hashPassword(validatedData.password),
+            role: "user", // Default role for new users
+          });
+
+          // Auto-login after registration
+          req.login(user, (err) => {
+            if (err) return next(err);
+            // Don't send password in response
+            const { password, ...userWithoutPassword } = user;
+            res.status(201).json(userWithoutPassword);
+          });
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            return res.status(400).json({
+              message: "Validation error",
+              errors: error.errors.map((e) => ({
+                path: e.path.join("."),
+                message: e.message,
+              })),
+            });
+          }
+          res.status(500).json({ message: "Registration failed" });
+        }
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Validation error", 
-          errors: error.errors.map(e => ({ path: e.path.join('.'), message: e.message }))
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors.map((e) => ({
+            path: e.path.join("."),
+            message: e.message,
+          })),
         });
       }
+      console.error("Registration error:", error);
       res.status(500).json({ message: "Registration failed" });
     }
   });
@@ -125,8 +175,11 @@ export function setupAuth(app: Express) {
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err, user, info) => {
       if (err) return next(err);
-      if (!user) return res.status(401).json({ message: "Invalid username or password" });
-      
+      if (!user)
+        return res
+          .status(401)
+          .json({ message: "Invalid username or password" });
+
       req.login(user, (err) => {
         if (err) return next(err);
         // Don't send password in response
@@ -148,5 +201,180 @@ export function setupAuth(app: Express) {
     // Don't send password in response
     const { password, ...userWithoutPassword } = req.user!;
     res.json(userWithoutPassword);
+  });
+
+  // Update user profile endpoint
+  app.patch("/api/user/profile", async (req, res) => {
+    if (!req.isAuthenticated())
+      return res.status(401).json({ message: "Unauthorized" });
+
+    try {
+      // Validate the update fields
+      const updateSchema = z.object({
+        fullName: z.string().min(2).optional(),
+        avatar: z.string().optional(),
+        address: z.string().optional(),
+        darkMode: z.boolean().optional(),
+      });
+
+      const validatedData = updateSchema.parse(req.body);
+
+      // Update user
+      const updatedUser = await storage.updateUser(req.user!.id, validatedData);
+
+      // Return updated user without password
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors.map((e) => ({
+            path: e.path.join("."),
+            message: e.message,
+          })),
+        });
+      }
+      res.status(500).json({ message: "Profile update failed" });
+    }
+  });
+
+  // Change password endpoint
+  app.patch("/api/user/password", async (req, res) => {
+    if (!req.isAuthenticated())
+      return res.status(401).json({ message: "Unauthorized" });
+
+    try {
+      // Validate the password change fields
+      const passwordChangeSchema = z.object({
+        currentPassword: z.string(),
+        newPassword: z
+          .string()
+          .min(8, "Password must be at least 8 characters"),
+      });
+
+      const validatedData = passwordChangeSchema.parse(req.body);
+
+      // Verify current password
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isCurrentPasswordValid = await comparePasswords(
+        validatedData.currentPassword,
+        user.password,
+      );
+
+      if (!isCurrentPasswordValid) {
+        return res
+          .status(400)
+          .json({ message: "Current password is incorrect" });
+      }
+
+      // Update password
+      const updatedUser = await storage.updateUser(user.id, {
+        password: await hashPassword(validatedData.newPassword),
+      });
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors.map((e) => ({
+            path: e.path.join("."),
+            message: e.message,
+          })),
+        });
+      }
+      res.status(500).json({ message: "Password change failed" });
+    }
+  });
+
+  // Admin endpoints - only accessible by users with admin role
+  app.get("/api/admin/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user!.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const users = await storage.getAllUsers();
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map((user) => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to retrieve users" });
+    }
+  });
+
+  // Update user role - admin only
+  app.patch("/api/admin/users/:userId/role", async (req, res) => {
+    if (!req.isAuthenticated() || req.user!.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const userId = parseInt(req.params.userId);
+      const roleSchema = z.object({
+        role: z.enum(["user", "admin"]),
+      });
+
+      const validatedData = roleSchema.parse(req.body);
+
+      // Prevent admin from demoting themselves
+      if (req.user!.id === userId && validatedData.role !== "admin") {
+        return res
+          .status(400)
+          .json({ message: "Cannot change your own admin role" });
+      }
+
+      const updatedUser = await storage.updateUserRole(
+        userId,
+        validatedData.role,
+      );
+
+      // Return updated user without password
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors.map((e) => ({
+            path: e.path.join("."),
+            message: e.message,
+          })),
+        });
+      }
+      res.status(500).json({ message: "Role update failed" });
+    }
+  });
+
+  // Delete user - admin only
+  app.delete("/api/admin/users/:userId", async (req, res) => {
+    if (!req.isAuthenticated() || req.user!.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const userId = parseInt(req.params.userId);
+
+      // Prevent admin from deleting themselves
+      if (req.user!.id === userId) {
+        return res
+          .status(400)
+          .json({ message: "Cannot delete your own account" });
+      }
+
+      await storage.deleteUser(userId);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "User deletion failed" });
+    }
   });
 }
