@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { 
   Dialog, 
   DialogContent, 
@@ -240,6 +241,47 @@ export default function PortfolioPage() {
       return sum + (currentValue - costBasis);
     }, 0);
   };
+
+  // Prepare data for allocation chart
+  const getAllocationData = () => {
+    if (!positions.length) return [];
+    
+    return positions.map((position: any) => {
+      const value = position.currentPrice 
+        ? position.shares * position.currentPrice 
+        : position.shares * position.purchasePrice;
+      
+      return {
+        name: position.symbol,
+        value: value,
+      };
+    });
+  };
+
+  // For a mock performance chart
+  const getPerformanceData = () => {
+    // In a real app, this would be actual historical data
+    const today = new Date();
+    const data = [];
+    for (let i = 30; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(today.getDate() - i);
+      
+      // Calculate a value based on existing position values plus some randomness for the example
+      const baseValue = calculatePortfolioValue(positions);
+      // Add a slight random factor to simulate market fluctuations
+      const factor = 1 + (Math.random() * 0.1 - 0.05) * (30 - i) / 10;
+      
+      data.push({
+        date: date.toLocaleDateString(),
+        value: baseValue * factor,
+      });
+    }
+    return data;
+  };
+
+  // Colors for the pie chart
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#83a6ed', '#8dd1e1', '#a4de6c'];
   
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -382,6 +424,40 @@ export default function PortfolioPage() {
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold">{selectedPortfolio?.name}</h3>
                     <div className="flex gap-2">
+                      <Dialog open={isDeletePortfolioOpen} onOpenChange={setIsDeletePortfolioOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Portfolio
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Delete Portfolio</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to delete this portfolio? This action cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsDeletePortfolioOpen(false)}>Cancel</Button>
+                            <Button 
+                              variant="destructive" 
+                              onClick={() => deletePortfolioMutation.mutate()}
+                              disabled={deletePortfolioMutation.isPending}
+                            >
+                              {deletePortfolioMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                "Delete"
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    
                       <Dialog open={isAddPositionOpen} onOpenChange={setIsAddPositionOpen}>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm">
@@ -522,40 +598,6 @@ export default function PortfolioPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      
-                      <Dialog open={isDeletePortfolioOpen} onOpenChange={setIsDeletePortfolioOpen}>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Delete Portfolio</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to delete this portfolio? This action cannot be undone 
-                              and all positions will be permanently removed.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter>
-                            <Button 
-                              variant="outline" 
-                              onClick={() => setIsDeletePortfolioOpen(false)}
-                            >
-                              Cancel
-                            </Button>
-                            <Button 
-                              variant="destructive" 
-                              onClick={() => deletePortfolioMutation.mutate()}
-                              disabled={deletePortfolioMutation.isPending}
-                            >
-                              {deletePortfolioMutation.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Deleting...
-                                </>
-                              ) : (
-                                "Delete"
-                              )}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
                     </div>
                   </div>
                   
@@ -597,94 +639,267 @@ export default function PortfolioPage() {
                     </Card>
                   </div>
                   
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Positions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {isLoadingPositions ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
-                          <span>Loading positions...</span>
-                        </div>
-                      ) : positions.length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b border-border">
-                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Symbol</th>
-                                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Shares</th>
-                                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Purchase Price</th>
-                                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Current Price</th>
-                                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Gain/Loss</th>
-                                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Value</th>
-                                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {positions.map((position: any) => {
-                                const currentPrice = position.currentPrice || position.purchasePrice;
-                                const value = position.shares * currentPrice;
-                                const costBasis = position.shares * position.purchasePrice;
-                                const gainLoss = value - costBasis;
-                                const gainLossPercent = ((value / costBasis) - 1) * 100;
-                                
-                                return (
-                                  <tr key={position.id} className="border-b border-border">
-                                    <td className="p-3">
-                                      <Link href={`/stock/${position.symbol}`}>
-                                        <div className="cursor-pointer font-medium text-foreground">
-                                          {position.symbol}
-                                        </div>
-                                      </Link>
-                                    </td>
-                                    <td className="p-3 text-right font-mono">{position.shares}</td>
-                                    <td className="p-3 text-right font-mono">${position.purchasePrice.toFixed(2)}</td>
-                                    <td className="p-3 text-right font-mono">${currentPrice.toFixed(2)}</td>
-                                    <td className={`p-3 text-right font-mono ${
-                                      gainLoss >= 0 ? 'text-green-500' : 'text-red-500'
-                                    }`}>
-                                      {gainLoss >= 0 ? '+' : ''}${gainLoss.toFixed(2)}
-                                      <br/>
-                                      <span className="text-xs">
-                                        {gainLoss >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%
-                                      </span>
-                                    </td>
-                                    <td className="p-3 text-right font-medium font-mono">${value.toFixed(2)}</td>
-                                    <td className="p-3 text-right">
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm"
-                                        onClick={() => {
-                                          setPositionToDelete(position.id);
-                                          setIsDeletePositionOpen(true);
-                                        }}
-                                      >
-                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                      </Button>
-                                    </td>
+                  <Tabs defaultValue="positions" className="mb-6">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="positions">Positions</TabsTrigger>
+                      <TabsTrigger value="performance">Performance</TabsTrigger>
+                      <TabsTrigger value="allocation">Allocation</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="positions">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Positions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {isLoadingPositions ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
+                              <span>Loading positions...</span>
+                            </div>
+                          ) : positions.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="border-b border-border">
+                                    <th className="text-left p-3 text-sm font-medium text-muted-foreground">Symbol</th>
+                                    <th className="text-right p-3 text-sm font-medium text-muted-foreground">Shares</th>
+                                    <th className="text-right p-3 text-sm font-medium text-muted-foreground">Purchase Price</th>
+                                    <th className="text-right p-3 text-sm font-medium text-muted-foreground">Current Price</th>
+                                    <th className="text-right p-3 text-sm font-medium text-muted-foreground">Gain/Loss</th>
+                                    <th className="text-right p-3 text-sm font-medium text-muted-foreground">Value</th>
+                                    <th className="text-right p-3 text-sm font-medium text-muted-foreground">Actions</th>
                                   </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <TrendingUp className="mx-auto h-10 w-10 opacity-50 mb-2" />
-                          <p>No positions in this portfolio</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="mt-4"
-                            onClick={() => setIsAddPositionOpen(true)}
-                          >
-                            Add your first position
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                                </thead>
+                                <tbody>
+                                  {positions.map((position: any) => {
+                                    const currentPrice = position.currentPrice || position.purchasePrice;
+                                    const value = position.shares * currentPrice;
+                                    const costBasis = position.shares * position.purchasePrice;
+                                    const gainLoss = value - costBasis;
+                                    const gainLossPercent = ((value / costBasis) - 1) * 100;
+                                    
+                                    return (
+                                      <tr key={position.id} className="border-b border-border">
+                                        <td className="p-3">
+                                          <Link href={`/stock/${position.symbol}`}>
+                                            <div className="cursor-pointer font-medium text-foreground">
+                                              {position.symbol}
+                                            </div>
+                                          </Link>
+                                        </td>
+                                        <td className="p-3 text-right font-mono">{position.shares}</td>
+                                        <td className="p-3 text-right font-mono">${position.purchasePrice.toFixed(2)}</td>
+                                        <td className="p-3 text-right font-mono">${currentPrice.toFixed(2)}</td>
+                                        <td className={`p-3 text-right font-mono ${
+                                          gainLoss >= 0 ? 'text-green-500' : 'text-red-500'
+                                        }`}>
+                                          {gainLoss >= 0 ? '+' : ''}${gainLoss.toFixed(2)}
+                                          <br/>
+                                          <span className="text-xs">
+                                            {gainLoss >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%
+                                          </span>
+                                        </td>
+                                        <td className="p-3 text-right font-medium font-mono">${value.toFixed(2)}</td>
+                                        <td className="p-3 text-right">
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm"
+                                            onClick={() => {
+                                              setPositionToDelete(position.id);
+                                              setIsDeletePositionOpen(true);
+                                            }}
+                                          >
+                                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <TrendingUp className="mx-auto h-10 w-10 opacity-50 mb-2" />
+                              <p>No positions in this portfolio</p>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="mt-4"
+                                onClick={() => setIsAddPositionOpen(true)}
+                              >
+                                Add your first position
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="performance">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Portfolio Performance</CardTitle>
+                          <CardDescription>
+                            Historical performance of your portfolio over time
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {isLoadingPositions ? (
+                            <div className="flex items-center justify-center py-16">
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
+                              <span>Loading performance data...</span>
+                            </div>
+                          ) : positions.length > 0 ? (
+                            <div className="w-full h-[400px]">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                  data={getPerformanceData()}
+                                  margin={{ top: 5, right: 30, left: 20, bottom: 30 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis 
+                                    dataKey="date" 
+                                    tick={{ fontSize: 12 }}
+                                    tickFormatter={(value) => {
+                                      const date = new Date(value);
+                                      return `${date.getMonth() + 1}/${date.getDate()}`;
+                                    }}
+                                  />
+                                  <YAxis 
+                                    tick={{ fontSize: 12 }}
+                                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                                  />
+                                  <Tooltip 
+                                    formatter={(value: any) => [`$${value.toFixed(2)}`, 'Value']}
+                                    labelFormatter={(label) => `Date: ${label}`}
+                                  />
+                                  <Legend />
+                                  <Line 
+                                    type="monotone" 
+                                    dataKey="value" 
+                                    name="Portfolio Value" 
+                                    stroke="#0088FE" 
+                                    activeDot={{ r: 8 }} 
+                                    strokeWidth={2}
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <TrendingUp className="mx-auto h-10 w-10 opacity-50 mb-2" />
+                              <p>Add positions to view performance data</p>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="mt-4"
+                                onClick={() => setIsAddPositionOpen(true)}
+                              >
+                                Add your first position
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="allocation">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Portfolio Allocation</CardTitle>
+                          <CardDescription>
+                            Distribution of assets in your portfolio
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {isLoadingPositions ? (
+                            <div className="flex items-center justify-center py-16">
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin text-primary" />
+                              <span>Loading allocation data...</span>
+                            </div>
+                          ) : positions.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="h-[400px] flex items-center justify-center">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <RechartsPieChart>
+                                    <Pie
+                                      data={getAllocationData()}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={60}
+                                      outerRadius={120}
+                                      paddingAngle={2}
+                                      dataKey="value"
+                                      nameKey="name"
+                                      label={({name, percent}) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                                    >
+                                      {getAllocationData().map((entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip formatter={(value: any) => [`$${value.toFixed(2)}`, 'Value']} />
+                                    <Legend formatter={(value, entry) => value} />
+                                  </RechartsPieChart>
+                                </ResponsiveContainer>
+                              </div>
+                              
+                              <div>
+                                <div className="space-y-4">
+                                  <h3 className="text-lg font-medium">Allocation Breakdown</h3>
+                                  <div className="space-y-3">
+                                    {getAllocationData().map((item: any, index: number) => {
+                                      const totalValue = calculatePortfolioValue(positions);
+                                      const percentage = (item.value / totalValue) * 100;
+                                      
+                                      return (
+                                        <div key={item.name} className="flex items-center justify-between">
+                                          <div className="flex items-center">
+                                            <div 
+                                              className="w-3 h-3 rounded-full mr-2" 
+                                              style={{ backgroundColor: COLORS[index % COLORS.length] }} 
+                                            />
+                                            <span className="font-medium">{item.name}</span>
+                                          </div>
+                                          <div className="text-right">
+                                            <div className="font-mono">${item.value.toFixed(2)}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                              {percentage.toFixed(1)}%
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  
+                                  <div className="pt-4 border-t border-border">
+                                    <div className="flex justify-between font-medium">
+                                      <span>Total</span>
+                                      <span className="font-mono">${calculatePortfolioValue(positions).toFixed(2)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <PieChart className="mx-auto h-10 w-10 opacity-50 mb-2" />
+                              <p>Add positions to view allocation data</p>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="mt-4"
+                                onClick={() => setIsAddPositionOpen(true)}
+                              >
+                                Add your first position
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
                   
                   <Dialog open={isDeletePositionOpen} onOpenChange={setIsDeletePositionOpen}>
                     <DialogContent>

@@ -202,6 +202,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Portfolio positions
+  // Get all positions for a portfolio
+  app.get("/api/portfolios/:id/positions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    
+    try {
+      const portfolioId = parseInt(req.params.id);
+      const portfolio = await storage.getPortfolioById(portfolioId);
+      
+      if (!portfolio || portfolio.userId !== req.user!.id) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+      
+      const positions = await storage.getPortfolioPositions(portfolioId);
+      
+      // Get current prices for the positions
+      const positionsWithCurrentPrices = await Promise.all(
+        positions.map(async (position) => {
+          try {
+            const stockInfo = await fetchStockQuote(position.symbol);
+            if (stockInfo && stockInfo.length > 0) {
+              return {
+                ...position,
+                currentPrice: stockInfo[0].price,
+                change: stockInfo[0].change,
+                changesPercentage: stockInfo[0].changesPercentage,
+                dayLow: stockInfo[0].dayLow,
+                dayHigh: stockInfo[0].dayHigh,
+              };
+            }
+            return position;
+          } catch (error) {
+            console.error(`Failed to fetch price for ${position.symbol}:`, error);
+            return position;
+          }
+        })
+      );
+      
+      res.json(positionsWithCurrentPrices);
+    } catch (error) {
+      console.error("Error fetching portfolio positions:", error);
+      res.status(500).json({ message: "Failed to fetch portfolio positions" });
+    }
+  });
+  
+  // Add new position to a portfolio
   app.post("/api/portfolios/:id/positions", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
