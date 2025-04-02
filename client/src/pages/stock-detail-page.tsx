@@ -8,9 +8,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { useStockQuote, useStockProfile } from "@/hooks/use-stocks";
+import { Loader2, Star, StarOff } from "lucide-react";
+import { useStockQuote, useStockProfile, useWatchlistItems } from "@/hooks/use-stocks";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function StockDetailPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -20,6 +22,61 @@ export default function StockDetailPage() {
   
   const { data: stockData, isLoading: isLoadingStock } = useStockQuote(symbol || "");
   const { data: companyProfile, isLoading: isLoadingProfile } = useStockProfile(symbol || "");
+  
+  // Get watchlist items
+  const { data: watchlistItems = [] } = useWatchlistItems();
+  
+  // Check if stock is in watchlist
+  const isInWatchlist = watchlistItems.some(
+    (item: any) => item.symbol.toUpperCase() === symbol?.toUpperCase()
+  );
+  
+  // Add to watchlist mutation
+  const addToWatchlistMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/watchlist/items", {
+        symbol,
+      });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      toast({
+        title: "Success",
+        description: `${symbol} added to your watchlist`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add to watchlist",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Remove from watchlist mutation
+  const removeFromWatchlistMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/watchlist/items/${symbol}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      toast({
+        title: "Success",
+        description: `${symbol} removed from your watchlist`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove from watchlist",
+        variant: "destructive",
+      });
+    },
+  });
   
   const isLoading = isLoadingStock || isLoadingProfile;
   
@@ -66,7 +123,15 @@ export default function StockDetailPage() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                       <div>
                         <h2 className="text-2xl font-semibold mb-1">{companyProfile?.companyName || stockData?.name}</h2>
-                        <p className="text-sm text-muted-foreground">{symbol} • {companyProfile?.exchange}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-muted-foreground">{symbol} • {companyProfile?.exchange}</p>
+                          {isInWatchlist && (
+                            <div className="flex items-center gap-1 text-xs text-yellow-500">
+                              <Star className="h-3 w-3 fill-yellow-500" />
+                              <span>In watchlist</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="mt-4 sm:mt-0 text-right">
                         <div className="text-3xl font-semibold font-mono">${stockData?.price.toFixed(2)}</div>
@@ -239,51 +304,44 @@ export default function StockDetailPage() {
                     </div>
                     
                     <div className="mt-6">
-                      <Button 
-                        className="w-full bg-[#0052CC] hover:bg-[#0747A6]"
-                        onClick={async () => {
-                          if (!user) return;
-                          
-                          try {
-                            // Add directly to watchlist without dialog
-                            const res = await fetch(`/api/watchlist/items`, {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({ symbol }),
-                            });
-                            
-                            if (res.ok) {
-                              // Show success toast
-                              toast({
-                                title: "Success",
-                                description: `${symbol} added to your watchlist`,
-                              });
-                            } else {
-                              const errorData = await res.json();
-                              if (errorData.message?.includes("already in watchlist")) {
-                                toast({
-                                  title: "Already in watchlist",
-                                  description: `${symbol} is already in your watchlist`,
-                                });
-                              } else {
-                                throw new Error(`Failed to add ${symbol} to watchlist: ${res.status}`);
-                              }
-                            }
-                          } catch (err) {
-                            console.error('Failed to add to watchlist:', err);
-                            toast({
-                              title: "Error",
-                              description: `Failed to add ${symbol} to watchlist`,
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                      >
-                        <i className="fas fa-star mr-2"></i>
-                        Add to Watchlist
-                      </Button>
+                      {isInWatchlist ? (
+                        <Button 
+                          variant="outline" 
+                          className="w-full text-yellow-500 border-yellow-500 hover:bg-yellow-500/10"
+                          onClick={() => removeFromWatchlistMutation.mutate()}
+                          disabled={removeFromWatchlistMutation.isPending}
+                        >
+                          {removeFromWatchlistMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Removing...
+                            </>
+                          ) : (
+                            <>
+                              <StarOff className="mr-2 h-4 w-4" />
+                              Remove from Watchlist
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button 
+                          className="w-full"
+                          onClick={() => addToWatchlistMutation.mutate()}
+                          disabled={addToWatchlistMutation.isPending}
+                        >
+                          {addToWatchlistMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            <>
+                              <Star className="mr-2 h-4 w-4" />
+                              Add to Watchlist
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

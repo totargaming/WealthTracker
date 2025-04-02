@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useStockSearch } from "@/hooks/use-stocks";
+import { Badge } from "@/components/ui/badge";
+import { useStockSearch, useWatchlistItems } from "@/hooks/use-stocks";
 import { Link, useLocation } from "wouter";
 import { useTheme } from "@/hooks/use-theme";
-import { Search, HelpCircle, Plus } from "lucide-react";
+import { Search, HelpCircle, Plus, Star } from "lucide-react";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -17,7 +18,16 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   const [location] = useLocation();
   const { theme, toggleTheme } = useTheme();
   
+  // Get search results
   const { data: searchResults = [], isLoading } = useStockSearch(searchQuery);
+  
+  // Get watchlist items
+  const { data: watchlistItems = [] } = useWatchlistItems();
+  
+  // Check if a stock is in the watchlist
+  const isInWatchlist = (symbol: string) => {
+    return watchlistItems.some((item: any) => item.symbol.toUpperCase() === symbol.toUpperCase());
+  };
   
   // Close search results when clicking outside
   useEffect(() => {
@@ -75,11 +85,16 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                   <li key={result.symbol}>
                     <Link href={`/stock/${result.symbol}`}>
                       <div 
-                        className="flex items-center px-4 py-2 hover:bg-muted cursor-pointer"
+                        className="flex items-center justify-between px-4 py-2 hover:bg-muted cursor-pointer"
                         onClick={() => setIsSearchResultsOpen(false)}
                       >
                         <div>
-                          <div className="font-medium text-foreground">{result.symbol}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">{result.symbol}</span>
+                            {isInWatchlist(result.symbol) && (
+                              <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">{result.name}</div>
                         </div>
                       </div>
@@ -146,8 +161,17 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         <Button asChild>
           <Link href={location === "/search" ? "/search" : "/watchlist"}>
             <div className="flex items-center">
-              <Plus className="h-4 w-4 mr-2" />
-              <span>Add to Watchlist</span>
+              {watchlistItems.length > 0 ? (
+                <>
+                  <Star className="h-4 w-4 mr-2 fill-current" />
+                  <span>Watchlist ({watchlistItems.length})</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span>Add to Watchlist</span>
+                </>
+              )}
             </div>
           </Link>
         </Button>

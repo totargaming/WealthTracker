@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
   DialogContent, 
@@ -14,13 +15,13 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useStockSearch, useStockQuote } from "@/hooks/use-stocks";
+import { useStockSearch, useStockQuote, useWatchlistItems, useIsInWatchlist } from "@/hooks/use-stocks";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star, Plus, StarOff } from "lucide-react";
 
 export default function SearchPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -38,6 +39,9 @@ export default function SearchPage() {
   // Get quote for selected stock
   const { data: stockData, isLoading: isLoadingStock } = useStockQuote(selectedSymbol || "");
   
+  // Get watchlist data
+  const { data: watchlistItems = [] } = useWatchlistItems();
+  
   // Add to watchlist mutation
   const addToWatchlistMutation = useMutation({
     mutationFn: async (symbol: string) => {
@@ -48,6 +52,7 @@ export default function SearchPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
       toast({
         title: "Success",
         description: "Stock added to watchlist",
@@ -62,6 +67,28 @@ export default function SearchPage() {
     },
   });
   
+  // Remove from watchlist mutation
+  const removeFromWatchlistMutation = useMutation({
+    mutationFn: async (symbol: string) => {
+      await apiRequest("DELETE", `/api/watchlist/items/${symbol}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      toast({
+        title: "Success",
+        description: "Stock removed from watchlist",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove from watchlist",
+        variant: "destructive",
+      });
+    },
+  });
+  
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     // The search is already triggered by the useStockSearch hook
@@ -70,6 +97,16 @@ export default function SearchPage() {
   const handleAddToWatchlist = (symbol: string) => {
     setSelectedSymbol(symbol);
     addToWatchlistMutation.mutate(symbol);
+  };
+  
+  const handleRemoveFromWatchlist = (symbol: string) => {
+    setSelectedSymbol(symbol);
+    removeFromWatchlistMutation.mutate(symbol);
+  };
+  
+  // Check if a stock is in the watchlist
+  const isInWatchlist = (symbol: string) => {
+    return watchlistItems.some((item: any) => item.symbol.toUpperCase() === symbol.toUpperCase());
   };
   
 
@@ -153,7 +190,15 @@ export default function SearchPage() {
                       <div>
                         <Link href={`/stock/${result.symbol}`}>
                           <div className="cursor-pointer">
-                            <h3 className="font-semibold text-foreground">{result.symbol}</h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-foreground">{result.symbol}</h3>
+                              {isInWatchlist(result.symbol) && (
+                                <Badge variant="outline" className="text-yellow-500 border-yellow-500">
+                                  <Star className="h-3 w-3 mr-1 fill-yellow-500" />
+                                  Watchlist
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">{result.name}</p>
                           </div>
                         </Link>
@@ -164,23 +209,48 @@ export default function SearchPage() {
                             <div>View Details</div>
                           </Link>
                         </Button>
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleAddToWatchlist(result.symbol)}
-                          disabled={addToWatchlistMutation.isPending && selectedSymbol === result.symbol}
-                        >
-                          {addToWatchlistMutation.isPending && selectedSymbol === result.symbol ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            <>
-                              <i className="fas fa-plus mr-2"></i>
-                              Add to Watchlist
-                            </>
-                          )}
-                        </Button>
+                        
+                        {isInWatchlist(result.symbol) ? (
+                          // Remove from watchlist button
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-yellow-500 border-yellow-500 hover:bg-yellow-500/10"
+                            onClick={() => handleRemoveFromWatchlist(result.symbol)}
+                            disabled={removeFromWatchlistMutation.isPending && selectedSymbol === result.symbol}
+                          >
+                            {removeFromWatchlistMutation.isPending && selectedSymbol === result.symbol ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Removing...
+                              </>
+                            ) : (
+                              <>
+                                <StarOff className="h-4 w-4 mr-1" />
+                                Remove
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          // Add to watchlist button
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleAddToWatchlist(result.symbol)}
+                            disabled={addToWatchlistMutation.isPending && selectedSymbol === result.symbol}
+                          >
+                            {addToWatchlistMutation.isPending && selectedSymbol === result.symbol ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add to Watchlist
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
