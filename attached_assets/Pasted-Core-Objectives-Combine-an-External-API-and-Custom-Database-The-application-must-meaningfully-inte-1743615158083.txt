@@ -1,0 +1,76 @@
+Core Objectives
+Combine an External API and Custom Database: The application must meaningfully integrate API data with your database to deliver a cohesive and functional user experience.
+Create a New Service or Experience: Use this integration to create a unique service, such as managing saved API results, adding user-generated content, or offering personalized recommendations.
+Emphasize Usability and Security: Ensure the application is easy to use, visually appealing, and adheres to best practices for web application security.
+General Requirements
+Responsive Design:
+Ensure your web application adjusts appropriately to different screen sizes, including mobile, tablet, and desktop devices.
+Accessible Design:
+Design your web application to be accessible to all users, following Web Content Accessibility Guidelines (WCAG). Include features such as keyboard navigation and alternative text for images.
+Error Handling:
+Provide meaningful and user-friendly error messages for issues such as failed logins, invalid form inputs, or problems with server or API communication.
+User Features
+User Registration and Login:
+Users must be able to create an account with a username, password, avatar image, and address.
+Passwords must be securely stored using a hashing algorithm.
+Users must be able to login and manage their account details (e.g., update avatar, address, or password).
+User Profile Management:
+Allow users to update their profile information, including uploading and previewing an avatar image before saving changes.
+Search and API Integration:
+Provide a search bar to query data from a third-party API (e.g., Google Books or NASA Rover Images).
+Display the search results dynamically on the page with options to filter and sort them.
+Interactive UI:
+Include dynamic elements such as modals, collapsible sections, or drag-and-drop functionality to enhance usability.
+Admin Features
+Admin User Account:
+Add new users.
+Delete existing users.
+List all registered users.
+Edit specific user details (e.g., update their address or avatar).
+Create a separate admin account with the following capabilities:
+Server-Side Functionality
+Session Management:
+Implement secure session handling, including user authentication, session timeouts, and logout functionality.
+Data Synchronization:
+Store selected API data (e.g., specific books or images) in the database so users can combine API results with custom data fields, such as personal notes or tags.
+Database Integration:
+Design and implement a relational database to manage the following:
+User accounts (username, password, avatar, address).
+Saved API results (e.g., favorite books or images).
+Relationships between users and their saved data.
+Searchable Database:
+Allow users to search through their saved API data (e.g., searching for a saved book by title or an image by a custom tag).
+Security Features
+Input Validation and Sanitization:
+Validate all user inputs on both the client and server sides to prevent SQL injection, XSS, and other security vulnerabilities.
+Password Security:
+Store passwords securely using a hashing algorithm.
+Role-Based Access Control:
+Restrict access to admin-only features, ensuring regular users cannot access or modify admin functionalities.
+Optional Features
+Each team should implement ONE of the following features.  Postgraduate teams are required to implement TWO:
+
+Dark/Light Mode:
+
+Offer a toggle for dark/light themes for better accessibility and user experience.
+Data Export:
+
+Allow users to export their saved data (e.g., books or images) in JSON, CSV, or PDF format.
+Achievements and Badges:
+
+Reward users with badges for completing certain actions (e.g., saving 10 books or tagging 5 images).
+Leaderboards:
+
+Create leaderboards for shared goals like "Most Books Saved" or "Top Image Tags."
+User Challenges:
+
+Offer challenges, such as finding rare or trending items via the API, to boost engagement.
+Analytics Dashboard:
+
+Provide admins with data visualizations on user activity (e.g., number of users, API queries, most-saved items).
+Password Strength Indicator:
+
+Display a real-time strength meter while users create passwords.
+Captcha for Forms:
+
+Add CAPTCHA to the registration and login forms to prevent bots.
