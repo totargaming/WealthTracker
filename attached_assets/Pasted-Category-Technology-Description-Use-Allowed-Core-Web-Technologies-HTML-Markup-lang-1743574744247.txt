@@ -1,0 +1,369 @@
+Category
+
+Technology
+
+Description
+
+Use Allowed
+
+Core Web Technologies
+
+HTML
+
+Markup language for structuring web pages
+
+✅
+
+ 
+
+CSS
+
+Stylesheet language for designing web pages
+
+✅
+
+ 
+
+JavaScript
+
+Scripting language for dynamic web content
+
+✅
+
+ 
+
+AJAX
+
+Technique for asynchronous web requests
+
+✅
+
+Backend Technologies
+
+Node.js
+
+JavaScript runtime for backend development
+
+✅
+
+ 
+
+Express
+
+Web framework for building APIs and apps
+
+✅
+
+Frontend Framework
+
+Vue
+
+Progressive framework for front-end development
+
+✅
+
+ 
+
+React
+
+Declarative JavaScript library for building UI components
+
+❌
+
+Database Technology
+
+SQL
+
+Language for querying and managing databases
+
+✅
+
+Frontend Libraries & Tools
+
+Bootstrap
+
+CSS framework for responsive design
+
+❌
+
+ 
+
+Tailwind CSS
+
+Utility-first CSS framework for styling
+
+❌
+
+ 
+
+FontAwesome
+
+Icon library for web applications
+
+✅
+
+ 
+
+Axios
+
+Promise-based HTTP client for AJAX requests
+
+✅
+
+ 
+
+jQuery
+
+JavaScript library for DOM manipulation
+
+✅
+
+ 
+
+Lodash
+
+Utility library for arrays, objects, functions
+
+✅
+
+ 
+
+Moment.js / Day.js
+
+Date handling and formatting library
+
+✅
+
+ 
+
+Chart.js / D3.js
+
+Libraries for creating interactive charts
+
+✅
+
+ 
+
+Vue Router
+
+Routing system for Vue applications
+
+❌
+
+ 
+
+Vuex / Pinia
+
+State management libraries for Vue
+
+❌
+
+ 
+
+SweetAlert2
+
+Library for better alert and confirmation dialogs
+
+❌
+
+Backend Middleware & Utilities
+
+dotenv
+
+Loads environment variables from `.env` files
+
+✅
+
+ 
+
+cors
+
+Middleware for enabling cross-origin requests
+
+❌
+
+ 
+
+body-parser
+
+Parses incoming request bodies in Express
+
+❌
+
+ 
+
+express-session
+
+Manages user sessions in Express
+
+✅
+
+ 
+
+jsonwebtoken (JWT)
+
+Token-based authentication library
+
+❌
+
+ 
+
+bcrypt / bcryptjs
+
+Library for password hashing
+
+❌
+
+ 
+
+multer
+
+Middleware for handling file uploads
+
+❌
+
+ 
+
+cookie-parser
+
+Middleware for parsing cookies
+
+✅
+
+ 
+
+helmet
+
+Security middleware for HTTP headers
+
+❌
+
+ 
+
+morgan
+
+Logger middleware for debugging
+
+❌
+
+Database Libraries & ORMs
+
+Sequelize / Knex.js
+
+ORM for database query handling
+
+❌
+
+ 
+
+MySQL2
+
+MySQL database driver for Node.js
+
+✅
+
+ 
+
+SQLite3
+
+Lightweight database for local storage
+
+✅
+
+ 
+
+pg (node-postgres)
+
+PostgreSQL client for Node.js
+
+❌
+
+Authentication & Security
+
+Passport.js
+
+Middleware for authentication strategies
+
+✅
+
+ 
+
+OAuth2 / Google Auth / Facebook Auth
+
+Third-party authentication integrations
+
+✅
+
+ 
+
+CSURF
+
+Middleware for preventing CSRF attacks
+
+❌
+
+Development & Testing Tools
+
+nodemon
+
+Tool for auto-restarting Node.js on changes
+
+✅
+
+Development & Testing Tools
+
+Jest / Mocha / Chai
+
+Testing frameworks for JavaScript
+
+❌
+
+ 
+
+Supertest
+
+Library for API testing
+
+❌
+
+ 
+
+ESLint / Prettier
+
+Code linting and formatting tools
+
+✅
+
+ 
+
+socket.io
+
+Real-time communication library
+
+✅
+
+ 
+
+Puppeteer / Playwright
+
+Libraries for web scraping and automation
+
+❌
+
+Other Utilities
+
+uuid
+
+Library for generating unique IDs
+
+✅
+
+ 
+
+Sharp
+
+Image processing library for Node.js
+
+✅
+
+If you are not sure if a tool you would like to use is acceptable email the course coordinators.
