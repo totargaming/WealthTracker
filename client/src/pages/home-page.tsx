@@ -2,32 +2,18 @@ import { useState } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/top-bar";
 import StockDetails from "@/components/stocks/stock-details";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useStockQuote } from "@/hooks/use-stocks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { PieChart, LineChart, Search, Plus, ArrowRight, RefreshCw } from "lucide-react";
-import WatchlistManagement from "@/components/stocks/watchlist-management";
+import UserWatchlistPreview from "@/components/stocks/user-watchlist-preview";
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedStock, setSelectedStock] = useState<string>("AAPL");
   const { user } = useAuth();
-  
-  // Fetch watchlists
-  const { data: watchlists = [] } = useQuery({
-    queryKey: ["/api/watchlists"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/watchlists");
-      return await res.json();
-    },
-  });
-
-  // Create default watchlist if user doesn't have any
-  const defaultWatchlist = watchlists?.[0];
   
   const { data: stockData, refetch } = useStockQuote(selectedStock);
   
@@ -173,23 +159,11 @@ export default function HomePage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {defaultWatchlist ? (
-                    <WatchlistManagement 
-                      watchlistId={defaultWatchlist.id}
-                      onSelectStock={handleSelectStock}
-                      selectedStock={selectedStock}
-                    />
-                  ) : (
-                    <div className="text-center py-6">
-                      <p className="text-muted-foreground mb-3">You don't have any watchlists yet</p>
-                      <Button asChild>
-                        <Link href="/watchlist">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Watchlist
-                        </Link>
-                      </Button>
-                    </div>
-                  )}
+                  <UserWatchlistPreview
+                    onSelectStock={handleSelectStock}
+                    selectedStock={selectedStock}
+                    limit={5}
+                  />
                 </CardContent>
               </Card>
             </div>

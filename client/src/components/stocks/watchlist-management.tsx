@@ -118,7 +118,9 @@ export default function WatchlistManagement({
       return await res.json();
     },
     onSuccess: () => {
+      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
       setIsCreateWatchlistOpen(false);
       createWatchlistForm.reset();
       toast({
@@ -156,7 +158,9 @@ export default function WatchlistManagement({
       return await res.json();
     },
     onSuccess: () => {
+      // Invalidate both endpoints to ensure dashboard and watchlist page are in sync
       queryClient.invalidateQueries({ queryKey: ["/api/watchlists", currentWatchlistId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
       setIsAddStockOpen(false);
       addStockForm.reset();
       setInvalidSymbolError(null);
@@ -185,7 +189,9 @@ export default function WatchlistManagement({
       await apiRequest("DELETE", `/api/watchlists/${currentWatchlistId}`);
     },
     onSuccess: () => {
+      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
       setIsDeleteWatchlistOpen(false);
       toast({
         title: "Success",
@@ -209,7 +215,9 @@ export default function WatchlistManagement({
       return itemId;
     },
     onSuccess: () => {
+      // Invalidate both endpoints to ensure dashboard and watchlist page are in sync
       queryClient.invalidateQueries({ queryKey: ["/api/watchlists", currentWatchlistId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist/items"] });
       setDeleteItemId(null);
       toast({
         title: "Success",
