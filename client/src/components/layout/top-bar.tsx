@@ -15,6 +15,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchResultsOpen, setIsSearchResultsOpen] = useState(false);
   const searchResultsRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [location] = useLocation();
   const { theme, toggleTheme } = useTheme();
   
@@ -23,11 +24,26 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   
   // Get watchlist items
   const { data: watchlistItems = [] } = useWatchlistItems();
+  const watchlistCount = watchlistItems.length;
   
   // Check if a stock is in the watchlist
   const isInWatchlist = (symbol: string) => {
     return watchlistItems.some((item: any) => item.symbol.toUpperCase() === symbol.toUpperCase());
   };
+  
+  // Focus search input with keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K or Cmd+K
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   
   // Close search results when clicking outside
   useEffect(() => {
@@ -60,8 +76,9 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input 
-            placeholder="Search for stocks, ETFs, indices..." 
-            className="pl-10"
+            ref={searchInputRef}
+            placeholder="Search for stocks, ETFs, indices... (Ctrl+K)" 
+            className="pl-10 pr-24"
             value={searchQuery}
             onChange={handleSearchChange}
             onFocus={() => {
@@ -70,6 +87,9 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
               }
             }}
           />
+          <kbd className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-50">
+            <span className="text-xs">⌘</span>K
+          </kbd>
         </div>
         
         {isSearchResultsOpen && (
@@ -158,13 +178,19 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           </Link>
         </Button>
         
-        <Button asChild>
-          <Link href={location === "/search" ? "/search" : "/watchlist"}>
+        <Button 
+          asChild
+          className={watchlistCount > 0 ? "bg-primary hover:bg-primary/90" : ""}
+        >
+          <Link href="/watchlist">
             <div className="flex items-center">
-              {watchlistItems.length > 0 ? (
+              {watchlistCount > 0 ? (
                 <>
                   <Star className="h-4 w-4 mr-2 fill-current" />
-                  <span>Watchlist ({watchlistItems.length})</span>
+                  <span>Watchlist</span>
+                  <Badge variant="secondary" className="ml-2 text-xs px-2 py-0 h-5">
+                    {watchlistCount}
+                  </Badge>
                 </>
               ) : (
                 <>

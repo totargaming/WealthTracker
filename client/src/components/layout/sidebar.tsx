@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { useTheme } from "@/hooks/use-theme";
+import { useWatchlistItems } from "@/hooks/use-stocks";
 import { 
   Home, 
   Star, 
@@ -14,6 +15,7 @@ import {
   LineChart,
   PieChart
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -25,6 +27,10 @@ export default function Sidebar({ isOpen, userName, userRole }: SidebarProps) {
   const [location] = useLocation();
   const { logoutMutation, isAdmin } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  
+  // Get watchlist items count
+  const { data: watchlistItems = [] } = useWatchlistItems();
+  const watchlistCount = watchlistItems.length;
   
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -42,7 +48,7 @@ export default function Sidebar({ isOpen, userName, userRole }: SidebarProps) {
 
   return (
     <aside 
-      className={`bg-card border-r border-border w-64 flex flex-col transition-all duration-300 fixed top-0 bottom-0 h-screen z-40 lg:relative lg:h-auto ${
+      className={`bg-card border-r border-border w-64 flex flex-col transition-all duration-300 fixed top-0 bottom-0 h-screen z-40 lg:sticky lg:h-screen lg:top-0 ${
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       }`}
     >
@@ -65,11 +71,18 @@ export default function Sidebar({ isOpen, userName, userRole }: SidebarProps) {
             </div>
           </Link>
           <Link href="/watchlist">
-            <div className={`flex items-center text-foreground px-2 py-2 rounded-md gap-2 hover:bg-muted ${
+            <div className={`flex items-center justify-between text-foreground px-2 py-2 rounded-md gap-2 hover:bg-muted ${
               location === "/watchlist" ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
             } cursor-pointer`}>
-              <Star className="h-4 w-4" />
-              <span className="text-sm">Watchlist</span>
+              <div className="flex items-center gap-2">
+                <Star className={`h-4 w-4 ${watchlistCount > 0 ? 'fill-yellow-500' : ''}`} />
+                <span className="text-sm">Watchlist</span>
+              </div>
+              {watchlistCount > 0 && (
+                <Badge variant="secondary" className="text-xs px-2 py-0 h-5">
+                  {watchlistCount}
+                </Badge>
+              )}
             </div>
           </Link>
           <Link href="/portfolio">
