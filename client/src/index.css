@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 14% 96%;
+    --foreground: 218 80% 15%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 218 80% 15%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 80% 15%;
+    
+    --primary: 210 100% 40%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 153 50% 45%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 220 14% 96%;
+    --muted-foreground: 218 30% 45%;
+    
+    --accent: 9 100% 59%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 9 100% 59%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 220 14% 86%;
+    --input: 220 14% 86%;
+    --ring: 210 100% 40%;
+    
+    --radius: 0.5rem;
+    
+    --chart-1: 210 100% 40%;
+    --chart-2: 153 50% 45%;
+    --chart-3: 9 100% 59%;
+    --chart-4: 38 100% 50%;
+    --chart-5: 223 83% 49%;
+  }
+  
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+  }
+  
+  table {
+    font-size: 0.9rem;
+  }
+  
+  /* Roboto Mono for financial data */
+  .font-mono {
+    font-family: 'Roboto Mono', monospace;
+  }
+}
+
+@layer components {
+  /* Custom grid layout for dashboard */
+  .dashboard-grid {
+    @apply grid grid-cols-1 gap-6;
+  }
+  
+  /* Market index card styling */
+  .market-index {
+    @apply bg-white rounded-md p-3 shadow-sm;
+  }
+  
+  /* Navigation link styling */
+  .nav-link {
+    @apply flex items-center gap-2 px-2 py-2 rounded-md text-neutral-800 hover:bg-neutral-100;
+  }
+  
+  .nav-link.active {
+    @apply bg-primary text-white hover:bg-primary/90;
+  }
+  
+  /* Stock list styling */
+  .stock-list {
+    @apply w-full border-collapse;
+  }
+  
+  .stock-list th {
+    @apply text-left p-2 border-b-2 border-neutral-300 text-neutral-700 font-medium text-sm;
+  }
+  
+  .stock-list td {
+    @apply p-2 border-b border-neutral-200 text-sm;
+  }
+  
+  .stock-list tr:hover {
+    @apply bg-neutral-100;
+  }
+  
+  /* Change indicators */
+  .change-positive {
+    @apply text-secondary;
+  }
+  
+  .change-negative {
+    @apply text-accent;
+  }
+}
