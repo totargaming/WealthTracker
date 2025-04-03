@@ -4,7 +4,7 @@ import { z } from "zod";
 
 // User table with additional fields for user preferences
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+  id: serial("id"),
   username: text("username").notNull().unique(),
   password: text("password"),  // Can be null for OAuth users
   email: text("email").notNull().unique(),
