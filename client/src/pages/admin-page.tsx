@@ -380,10 +380,10 @@ export default function AdminPage() {
   // If not admin, show access denied
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#F4F5F7]">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-xl text-[#FF5630]">Access Denied</CardTitle>
+            <CardTitle className="text-xl text-destructive">Access Denied</CardTitle>
             <CardDescription>
               You don't have permission to access the admin dashboard.
             </CardDescription>
@@ -400,14 +400,14 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="container flex min-h-screen bg-[#F4F5F7]">
+    <div className="container flex min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} userName={user?.fullName || ""} userRole={user?.role || ""} />
       
       <button 
-        className={`fixed left-5 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-[#DFE1E6] bg-white shadow-md lg:hidden`}
+        className={`fixed left-5 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-md lg:hidden`}
         onClick={toggleSidebar}
       >
-        <i className="fas fa-bars text-[#505F79]"></i>
+        <i className="fas fa-bars text-muted-foreground"></i>
       </button>
       
       <main className={`flex-grow overflow-x-hidden transition-all duration-300`}>
@@ -415,8 +415,8 @@ export default function AdminPage() {
         
         <div className="p-6">
           <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-[#172B4D] font-['Inter']">Admin Dashboard</h2>
-            <p className="text-[#6B778C]">Manage users and system settings</p>
+            <h2 className="text-2xl font-semibold text-foreground font-['Inter']">Admin Dashboard</h2>
+            <p className="text-muted-foreground">Manage users and system settings</p>
           </div>
           
           <Tabs defaultValue="users">
