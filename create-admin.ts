@@ -25,6 +25,15 @@ async function createAdminUser() {
     console.log('Admin user created successfully:', adminUser.username);
   } catch (error) {
     console.error('Error creating admin user:', error);
+  } finally {
+    // Prevent the storage instance from attempting to create another admin user
+    // by setting a flag or directly accessing any auto-initialization properties
+    if (typeof storage['createAdminIfNeeded'] === 'function') {
+      // Replace the function with a no-op to prevent it from running
+      storage['createAdminIfNeeded'] = async () => {
+        console.log('Admin creation via storage initialization skipped');
+      };
+    }
   }
 }
 

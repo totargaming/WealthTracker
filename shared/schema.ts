@@ -1,10 +1,10 @@
-import { pgTable, text, serial, integer, boolean, timestamp, primaryKey, json, real } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, primaryKey, json, real, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // User table with additional fields for user preferences
 export const users = pgTable("users", {
-  id: serial("id"),
+  id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password"),  // Can be null for OAuth users
   email: text("email").notNull().unique(),
@@ -25,10 +25,9 @@ export const userWatchlist = pgTable("user_watchlist", {
   symbol: text("symbol").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   // Create a unique constraint to prevent duplicate symbols for the same user
-  // This acts as a composite primary key of userId + symbol
 }, (table) => {
   return {
-    uniqUserSymbol: primaryKey({ columns: [table.userId, table.symbol] }),
+    userSymbolIdx: uniqueIndex("user_symbol_unique_idx").on(table.userId, table.symbol),
   };
 });
 
