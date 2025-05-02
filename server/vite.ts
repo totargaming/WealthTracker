@@ -5,6 +5,10 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import { fileURLToPath } from 'url'; // Import fileURLToPath
+
+const __filename = fileURLToPath(import.meta.url); // Get current file path
+const __dirname = path.dirname(__filename); // Get current directory path
 
 const viteLogger = createLogger();
 
@@ -23,7 +27,7 @@ export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
-    allowedHosts: true,
+    host: true, // Add host: true, remove allowedHosts
   };
 
   const vite = await createViteServer({
@@ -45,8 +49,10 @@ export async function setupVite(app: Express, server: Server) {
     const url = req.originalUrl;
 
     try {
+      // Correctly resolve path using standard ESM properties
+      const currentDir = path.dirname(fileURLToPath(import.meta.url));
       const clientTemplate = path.resolve(
-        import.meta.dirname,
+        currentDir, // Use the correctly derived directory
         "..",
         "client",
         "index.html",
@@ -68,11 +74,12 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Use the derived __dirname. Assumes server code is in 'dist' and client build is in 'dist/public'.
+  const distPath = path.resolve(__dirname, "public"); // Adjusted path relative to server/dist
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory: ${distPath}, make sure to build the client first into the 'public' subdirectory of the server distribution.`
     );
   }
 
@@ -80,6 +87,7 @@ export function serveStatic(app: Express) {
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    // Use the derived distPath
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
