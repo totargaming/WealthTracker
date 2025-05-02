@@ -72,7 +72,7 @@ export default function AuthPage() {
             <div className="flex justify-center mb-4">
               <i className="fas fa-chart-line text-4xl text-[#0052CC]"></i>
             </div>
-            <h1 className="text-3xl font-bold text-[#172B4D] font-['Inter']">FinTrack</h1>
+            <h1 className="text-3xl font-bold text-[#172B4D] font-['Inter']">WealthTracker</h1>
             <p className="text-[#505F79] mt-2">Your Financial Portfolio Tracker</p>
           </div>
           
@@ -332,7 +332,7 @@ export default function AuthPage() {
         <div className="max-w-lg text-white">
           <h2 className="text-4xl font-bold mb-6 font-['Inter']">Track Your Financial Future</h2>
           <p className="text-lg mb-8">
-            FinTrack provides comprehensive stock market data, portfolio tracking, and financial insights to help you make informed investment decisions.
+            WealthTracker provides comprehensive stock market data, portfolio tracking, and financial insights to help you make informed investment decisions.
           </p>
           <div className="space-y-4">
             <div className="flex items-start">

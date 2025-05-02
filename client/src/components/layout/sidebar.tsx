@@ -54,7 +54,7 @@ export default function Sidebar({ isOpen, userName, userRole }: SidebarProps) {
     >
       <div className="p-4 border-b border-border flex items-center gap-2">
         <LineChart className="text-primary h-6 w-6" />
-        <h1 className="text-xl font-semibold text-primary font-['Inter']">FinTrack</h1>
+        <h1 className="text-xl font-semibold text-primary font-['Inter']">WealthTracker</h1>
       </div>
       
       <nav className="p-3 flex-grow">

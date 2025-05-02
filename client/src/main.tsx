@@ -16,7 +16,7 @@ document.head.appendChild(fontAwesome);
 
 // Add title
 const titleElement = document.createElement('title');
-titleElement.textContent = 'FinTrack - Financial Portfolio Tracker';
+titleElement.textContent = 'WealthTracker - Financial Portfolio Tracker';
 document.head.appendChild(titleElement);
 
 createRoot(document.getElementById("root")!).render(<App />);
